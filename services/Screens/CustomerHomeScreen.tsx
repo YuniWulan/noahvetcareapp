@@ -3,18 +3,18 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ImageBackg
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from './App';
+import { RootStackParamList } from '../../App';  
 
-type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'CustomerHome'>;
 
 const HomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const pets = [
-    { name: 'Arthur', image: require('./assets/dog2.jpg') },
-    { name: 'Angel', image: require('./assets/dog1.jpg') },
-    { name: 'Mitchell', image: require('./assets/dog3.jpg') },
-    { name: 'Bembi', image: require('./assets/cat1.jpg') },
-    { name: 'Ronald', image: require('./assets/dog4.jpg') }
+    { name: 'Arthur', image: require('../../assets/dog2.jpg') },
+    { name: 'Angel', image: require('../../assets/dog1.jpg') },
+    { name: 'Mitchell', image: require('../../assets/dog3.jpg') },
+    { name: 'Bembi', image: require('../../assets/cat1.jpg') },
+    { name: 'Ronald', image: require('../../assets/dog4.jpg') }
   ];
   
   const reservations = [
@@ -25,7 +25,7 @@ const HomeScreen = () => {
       date: 'Tuesday, Dec 20',
       time: '09.00 AM',
       status: 'Terjadwal',
-      image: require('./assets/dog1.jpg')
+      image: require('../../assets/dog1.jpg')
     },
     {
       id: '2',
@@ -34,7 +34,7 @@ const HomeScreen = () => {
       date: 'Wednesday, Dec 21',
       time: '10.30 AM',
       status: 'Menunggu',
-      image: require('./assets/dog2.jpg')
+      image: require('../../assets/dog2.jpg')
     },
     {
       id: '3',
@@ -43,7 +43,7 @@ const HomeScreen = () => {
       date: 'Thursday, Dec 22',
       time: '02.15 PM',
       status: 'Terjadwal',
-      image: require('./assets/cat1.jpg')
+      image: require('../../assets/cat1.jpg')
     }
   ];
 
@@ -66,7 +66,7 @@ const HomeScreen = () => {
         </View>
 
         <ImageBackground 
-          source={require('./assets/hero-image.png')}
+          source={require('../../assets/hero-image.png')}
           style={styles.heroBackground}
           imageStyle={styles.heroBackgroundImage}
           resizeMode="cover"

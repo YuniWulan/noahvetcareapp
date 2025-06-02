@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'rea
 import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { RootStackParamList } from './App';
+import { RootStackParamList } from '../../App';  
+
 
 type ProfileScreenNavigationProp = BottomTabNavigationProp<RootStackParamList, 'Profile'>;
 
@@ -21,10 +22,10 @@ const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
 
   const petsRow1: PetType[] = [
-    { name: 'Arthur', image: require('./assets/dog1.jpg') },
-    { name: 'Angel', image: require('./assets/dog2.jpg') },
-    { name: 'Mitchell', image: require('./assets/dog3.jpg') },
-    { name: 'Raya', image: require('./assets/cat1.jpg') },
+    { name: 'Arthur', image: require('../../assets/dog1.jpg') },
+    { name: 'Angel', image: require('../../assets/dog2.jpg') },
+    { name: 'Mitchell', image: require('../../assets/dog3.jpg') },
+    { name: 'Raya', image: require('../../assets/cat1.jpg') },
   ];
 
   const menuItems: MenuItemType[] = [
@@ -57,7 +58,7 @@ const ProfileScreen = () => {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.profileHeader}>
           <Image 
-            source={require('./assets/user-image.jpg')} 
+            source={require('../../assets/user-image.jpg')} 
             style={styles.profileImage}
           />
           <View style={styles.profileInfo}>

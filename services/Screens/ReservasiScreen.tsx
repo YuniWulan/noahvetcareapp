@@ -4,8 +4,9 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import api from './services/api'
-import { RootStackParamList } from './App';
+import api from '../../assets/api'
+import { RootStackParamList } from '../../App';  
+
 
 type ReservasiNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -22,11 +23,11 @@ export default function Reservasi() {
   const [selectedDoctor, setSelectedDoctor] = useState<number>(8);
 
   const pets = [
-    { id: 1, name: 'Arthur', image: require('./assets/dog1.jpg') },
-    { id: 2, name: 'Angel', image: require('./assets/dog2.jpg') },
-    { id: 3, name: 'Mitchell', image: require('./assets/dog3.jpg') },
-    { id: 4, name: 'Bembi', image: require('./assets/cat1.jpg') },
-    { id: 5, name: 'Ronald', image: require('./assets/dog4.jpg') }
+    { id: 1, name: 'Arthur', image: require('../../assets/dog1.jpg') },
+    { id: 2, name: 'Angel', image: require('../../assets/dog2.jpg') },
+    { id: 3, name: 'Mitchell', image: require('../../assets/dog3.jpg') },
+    { id: 4, name: 'Bembi', image: require('../../assets/cat1.jpg') },
+    { id: 5, name: 'Ronald', image: require('../../assets/dog4.jpg') }
   ];
 
   const doctors = [
