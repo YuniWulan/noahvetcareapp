@@ -3,26 +3,28 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons } from '@expo/vector-icons';
-import HomeScreen from './home';
-import ReservationListScreen from './ReservationListScreen';
-import ReservasiScreen from './Reservasi';
-import TransactionScreen from './transaction';
-import ReservationSuccessScreen from './ReservationSuccessScreen';
-import Profile from './profile';
-import EditProfile from './editprofil';
-import ChangePassword from './changePassword';
 
-export type RootStackParamList = {
-  MainTabs: undefined;
-  Reservasi: undefined;
-  ReservationList: undefined;
-  Transaction: undefined;
-  ReservationSuccess: { appointmentId: number };
-  Profile: undefined;
-  EditProfile: undefined;
-  ChangePassword: undefined;
-};
+// Auth Screens
+import { LoginScreen } from './services/Screens/LoginScreen';
+import { RegisterScreen } from './services/Screens/RegisterScreen';
+import { ForgotPasswordScreen } from './services/Screens/ForgotPasswordScreen';
+import { OtpVerificationScreen } from './services/Screens/OtpVerificationScreen';
+import { ResetPasswordScreen } from './services/Screens/ResetPasswordScreen';
 
+// Customer/Doctor Home
+import CustomerHomeScreen from './services/Screens/CustomerHomeScreen';
+import DoctorHomeScreen from './services/Screens/DoctorHomeScreen';
+
+// Feature Screens
+import ReservasiScreen from './services/Screens/ReservasiScreen';
+import ReservationListScreen from './services/Screens/ReservationListScreen';
+import TransactionScreen from './services/Screens/TransactionScreen';
+import ReservationSuccessScreen from './services/Screens/ReservationSuccessScreen';
+import ProfileScreen from './services/Screens/ProfileScreen';
+import EditProfileScreen from './services/Screens/EditProfilScreen';
+import ChangePasswordScreen from './services/Screens/ChangePasswordScreen';
+
+// Define Tab Params
 export type MainTabParamList = {
   Home: undefined;
   ReservationList: undefined;
@@ -30,7 +32,6 @@ export type MainTabParamList = {
   Profile: undefined;
 };
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabs() {
@@ -46,9 +47,9 @@ function MainTabs() {
         },
       }}
     >
-      <Tab.Screen 
-        name="Home" 
-        component={HomeScreen}
+      <Tab.Screen
+        name="Home"
+        component={CustomerHomeScreen}
         options={{
           tabBarLabel: 'Home',
           tabBarIcon: ({ color, size }) => (
@@ -56,8 +57,8 @@ function MainTabs() {
           ),
         }}
       />
-      <Tab.Screen 
-        name="ReservationList" 
+      <Tab.Screen
+        name="ReservationList"
         component={ReservationListScreen}
         options={{
           tabBarLabel: 'Reservation',
@@ -66,8 +67,8 @@ function MainTabs() {
           ),
         }}
       />
-      <Tab.Screen 
-        name="Transaction" 
+      <Tab.Screen
+        name="Transaction"
         component={TransactionScreen}
         options={{
           tabBarLabel: 'Transaction',
@@ -76,9 +77,9 @@ function MainTabs() {
           ),
         }}
       />
-      <Tab.Screen 
-        name="Profile" 
-        component={Profile}
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
         options={{
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color, size }) => (
@@ -90,18 +91,51 @@ function MainTabs() {
   );
 }
 
+export type RootStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
+  OtpVerification: { email: string };
+  ResetPassword: undefined;
+  CustomerHome: undefined;
+  DoctorHome: undefined;
+  MainTabs: undefined;
+  Reservasi: undefined;
+  ReservationList: undefined;
+  Transaction: undefined;
+  ReservationSuccess: { appointmentId: number };
+  Profile: undefined;
+  EditProfile: undefined;
+  ChangePassword: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="MainTabs" screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="MainTabs" component={MainTabs} />
-        <Stack.Screen name="Reservasi" component={ReservasiScreen} />
-        <Stack.Screen name="Transaction" component={TransactionScreen} />
-        <Stack.Screen name="ReservationSuccess" component={ReservationSuccessScreen} />
-        <Stack.Screen name="Profile" component={Profile} />
-        <Stack.Screen name="EditProfile" component={EditProfile} />
-        <Stack.Screen name="ChangePassword" component={ChangePassword} />
+      <Stack.Navigator initialRouteName="Login" screenOptions={{ headerTitleAlign: 'center' }}>
+        {/* Auth Screens */}
+        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerTitle: '' }} />
+        <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} options={{ headerTitle: '' }} />
+        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ headerTitle: '' }} />
+
+        {/* Home and Tabs */}
+        <Stack.Screen name="CustomerHome" component={CustomerHomeScreen} options={{ title: '' }} />
+        <Stack.Screen name="DoctorHome" component={DoctorHomeScreen} options={{ title: '' }} />
+        <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+
+        {/* Other Screens */}
+        <Stack.Screen name="Reservasi" component={ReservasiScreen} options={{ title: '' }} />
+        <Stack.Screen name="ReservationList" component={ReservationListScreen} options={{ title: '' }} />
+        <Stack.Screen name="Transaction" component={TransactionScreen} options={{ title: '' }} />
+        <Stack.Screen name="ReservationSuccess" component={ReservationSuccessScreen} options={{ title: '' }} />
+        <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: '' }} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: '' }} />
+        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: '' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
-};
+}

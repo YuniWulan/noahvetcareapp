@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'rea
 import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { RootStackParamList } from './App';
+import { RootStackParamList } from '../../App';  
+
 
 type ProfileScreenNavigationProp = BottomTabNavigationProp<RootStackParamList, 'Profile'>;
 

@@ -1,0 +1,19 @@
+/* global.css - Hide native password toggle buttons across browsers */
+
+/* Untuk Internet Explorer dan Edge lama */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
+/* Untuk Chrome/Safari (WebKit-based) */
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-clear-button,
+input[type="password"]::-webkit-password-toggle-button {
+  display: none !important;
+}
+
+/* Firefox tidak menampilkan icon bawaan, tapi kita bisa pakai ini untuk keamanan */
+input[type="password"] {
+  -moz-appearance: textfield; /* Menghindari tampilan default password field di Firefox */
+}

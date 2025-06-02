@@ -4,8 +4,9 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import api from './services/api'
-import { RootStackParamList } from './App';
+import api from '../../assets/api'
+import { RootStackParamList } from '../../App';  
+
 
 type ReservasiNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
