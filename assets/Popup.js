@@ -21,7 +21,7 @@ const PasswordUpdatedModal = ({ visible, onClose }) => {
           <TouchableWithoutFeedback>
             <View style={styles.popup}>
               <Image
-                source={require('../checkmark.png')}
+                source={require('./checkmark.png')}
                 style={styles.icon}
               />
               <Text style={styles.title}>Kata Sandi Berhasil Diperbarui</Text>

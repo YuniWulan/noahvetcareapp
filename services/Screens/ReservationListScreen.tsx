@@ -32,7 +32,7 @@ const ReservationListScreen = () => {
       date: 'Tuesday, Dec 20',
       time: '09.00 AM',
       status: 'Terjadwal',
-      image: require('./assets/dog1.jpg')
+      image: require('../../assets/dog1.jpg')
     },
     {
       id: '2',
@@ -41,7 +41,7 @@ const ReservationListScreen = () => {
       date: 'Tuesday, Dec 20',
       time: '09.00 AM',
       status: 'Menunggu',
-      image: require('./assets/dog2.jpg')
+      image: require('../../assets/dog2.jpg')
     },
     {
       id: '3',
@@ -50,7 +50,7 @@ const ReservationListScreen = () => {
       date: 'Tuesday, Dec 20',
       time: '09.00 AM',
       status: 'Terjadwal',
-      image: require('./assets/cat1.jpg')
+      image: require('../../assets/cat1.jpg')
     },
     {
       id: '4',
@@ -59,7 +59,7 @@ const ReservationListScreen = () => {
       date: 'Tuesday, Dec 15',
       time: '09.00 AM',
       status: 'Ditolak',
-      image: require('./assets/dog1.jpg')
+      image: require('../../assets/dog1.jpg')
     },
     {
       id: '5',
@@ -68,7 +68,7 @@ const ReservationListScreen = () => {
       date: 'Monday, Dec 19',
       time: '10.00 AM',
       status: 'Selesai',
-      image: require('./assets/dog3.jpg')
+      image: require('../../assets/dog3.jpg')
     },
     {
       id: '6',
@@ -77,7 +77,7 @@ const ReservationListScreen = () => {
       date: 'Friday, Dec 16',
       time: '02.00 PM',
       status: 'Selesai',
-      image: require('./assets/dog4.jpg')
+      image: require('../../assets/dog4.jpg')
     },
   ];
 

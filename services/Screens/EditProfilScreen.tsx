@@ -30,7 +30,7 @@ const EditProfileScreen = () => {
       <View style={styles.container}>
         <View style={styles.profileImageContainer}>
           <Image 
-            source={require('./assets/user-image.jpg')}
+            source={require('../../assets/user-image.jpg')}
             style={styles.profileImage}
           />
           <TouchableOpacity style={styles.editImageButton}>
