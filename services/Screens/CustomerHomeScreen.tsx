@@ -5,7 +5,14 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';  
 
-type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'CustomerHome'>;
+type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+type TabParamList = {
+  Home: undefined;
+  ReservationList: undefined;
+  Transaction: undefined;
+  Profile: undefined;
+};
 
 const HomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();

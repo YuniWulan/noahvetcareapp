@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons,Ionicons } from '@expo/vector-icons';
 
 // Auth Screens
 import { LoginScreen } from './services/Screens/LoginScreen';
@@ -23,6 +23,7 @@ import ReservationSuccessScreen from './services/Screens/ReservationSuccessScree
 import ProfileScreen from './services/Screens/ProfileScreen';
 import EditProfileScreen from './services/Screens/EditProfilScreen';
 import ChangePasswordScreen from './services/Screens/ChangePasswordScreen';
+import AddPetScreen from './services/Screens/AddPetScreen';
 
 // Define Tab Params
 export type MainTabParamList = {
@@ -101,12 +102,23 @@ export type RootStackParamList = {
   DoctorHome: undefined;
   MainTabs: undefined;
   Reservasi: undefined;
-  ReservationList: undefined;
+  ReservationList?: {
+    newReservation?: {
+      id: string;
+      petName: string;
+      gender: string;
+      date: string;
+      time: string;
+      status: string;
+      image: any;
+    };
+  };
   Transaction: undefined;
   ReservationSuccess: { appointmentId: number };
-  Profile: undefined;
+  Profile: { refresh?: boolean } | undefined;
   EditProfile: undefined;
   ChangePassword: undefined;
+  AddPetScreen: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -123,7 +135,7 @@ export default function App() {
         <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ headerTitle: '' }} />
 
         {/* Home and Tabs */}
-        <Stack.Screen name="CustomerHome" component={CustomerHomeScreen} options={{ title: '' }} />
+        {/* <Stack.Screen name="CustomerHome" component={CustomerHomeScreen} options={{ headerShown: false }}/> */}
         <Stack.Screen name="DoctorHome" component={DoctorHomeScreen} options={{ title: '' }} />
         <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
 
@@ -135,6 +147,7 @@ export default function App() {
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: '' }} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: '' }} />
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: '' }} />
+        <Stack.Screen name="AddPetScreen" component={AddPetScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

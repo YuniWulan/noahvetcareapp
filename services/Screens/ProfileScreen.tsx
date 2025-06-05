@@ -1,12 +1,15 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { 
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, 
+  Alert, ActivityIndicator 
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { RootStackParamList } from '../../App';  
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../App';
 
-
-type ProfileScreenNavigationProp = BottomTabNavigationProp<RootStackParamList, 'Profile'>;
+type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Profile'>;
 
 type MenuItemType = {
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -14,44 +17,142 @@ type MenuItemType = {
 };
 
 type PetType = {
-  name: string;
-  image: any;
+  id: number;
+  pet_name: string;
+  species: string;
+  age: number;
+  image?: any;
+};
+
+type UserData = {
+  username: string;
+  email?: string;
+  name?: string;
+  full_name?: string;
+  id?: string;
+  user_id?: string;
+  _id?: string;
 };
 
 const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
-
-  const petsRow1: PetType[] = [
-    { name: 'Arthur', image: require('../../assets/dog1.jpg') },
-    { name: 'Angel', image: require('../../assets/dog2.jpg') },
-    { name: 'Mitchell', image: require('../../assets/dog3.jpg') },
-    { name: 'Raya', image: require('../../assets/cat1.jpg') },
-  ];
+  const [user, setUser] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pets, setPets] = useState<PetType[]>([]);
 
   const menuItems: MenuItemType[] = [
     { icon: 'password', title: 'Ubah Kata Sandi' },
-    { icon: 'security', title: 'Syarat & Ketentuan ' },
+    { icon: 'security', title: 'Syarat & Ketentuan' },
     { icon: 'logout', title: 'Log Out' }
   ];
 
-  const handleAddPet = () => {
-    console.log('Add pet pressed');
-    // navigation.navigate('AddPet');
+  const loadUser = async () => {
+    try {
+      const userString = await AsyncStorage.getItem('user');
+      if (!userString) {
+        Alert.alert('Error', 'Data user tidak ditemukan. Silakan login ulang.');
+        navigation.replace('Login');
+        return;
+      }
+      const userData = JSON.parse(userString);
+      setUser(userData);
+    } catch (e) {
+      Alert.alert('Error', 'Gagal memuat data user.');
+    }
   };
 
-  const handleMenuItemPress = (title: string) => {
-  switch (title) {
-    case 'Ubah Kata Sandi':
-      navigation.navigate('ChangePassword');
-      break;
-    case 'Syarat & Ketentuan':
-      break;
-    case 'Log Out':
-      break;
-    default:
-      console.log(`${title} pressed`);
+  const fetchPetsFromAPI = async (userId: string, token: string) => {
+    try {
+      const response = await fetch(`https://noahvetcare.naufalalfa.com/v1/api/pet/lists/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error('Gagal mengambil data hewan');
+
+      const data = await response.json();
+      console.log("API result:", data);
+      setPets(data.petData || []); 
+    } catch (error) {
+      console.log('Gagal fetch pets dari API:', error);
+      fetchPetsFromStorage(); // fallback
+    }
+  };
+
+  const fetchPetsFromStorage = async () => {
+    try {
+      const petsString = await AsyncStorage.getItem('pets');
+      if (petsString) {
+        setPets(JSON.parse(petsString));
+      } else {
+        setPets([]);
+      }
+    } catch (error) {
+      console.log('Fetch pets from storage error:', error);
+    }
+  };
+
+  const fetchPets = async () => {
+    const token = await AsyncStorage.getItem("token");
+    const userString = await AsyncStorage.getItem("user");
+    if (!token || !userString) return;
+
+    const parsedUser = JSON.parse(userString);
+    const userId = parsedUser.id || parsedUser.user_id || parsedUser._id;
+    if (!userId) return;
+
+    await fetchPetsFromAPI(userId, token);
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      await loadUser();
+      await fetchPets();
+      setLoading(false);
+    };
+    init();
+  }, []);
+
+  useFocusEffect(
+  useCallback(() => {
+    const refresh = async () => {
+      setLoading(true);
+      await loadUser();
+      await fetchPets();
+      setLoading(false);
+    };
+    refresh();
+    }, [])
+  );
+
+  const handleAddPet = () => {
+    navigation.navigate('AddPetScreen');
+  };
+
+  const handleMenuItemPress = async (title: string) => {
+    switch (title) {
+      case 'Ubah Kata Sandi':
+        navigation.navigate('ChangePassword');
+        break;
+      case 'Syarat & Ketentuan':
+        break; 
+      case 'Log Out':
+        await AsyncStorage.removeItem('token');
+        await AsyncStorage.removeItem('user');
+        navigation.replace('Login');
+        break;
+      default:
+        console.log(`${title} pressed`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#2196F3" />
+      </View>
+    );
   }
-};
 
   return (
     <View style={styles.container}>
@@ -59,20 +160,22 @@ const ProfileScreen = () => {
         <View style={styles.profileHeader}>
           <Image 
             source={require('../../assets/user-image.jpg')} 
-            style={styles.profileImage}
+            style={styles.petImage}
           />
+         
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Bob Johnson Andreas</Text>
-            <Text style={styles.profileEmail}>andreasbobj@gmail.com</Text>
-             <TouchableOpacity 
-                style={styles.editButton}
-                onPress={() => navigation.navigate('EditProfile')}
-             >
+            <Text style={styles.profileName}>
+              {user?.username || 'User'}
+            </Text>
+            <Text style={styles.profileEmail}>{user?.email || '-'}</Text>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={() => navigation.navigate('EditProfile')}
+            >
               <FontAwesome name="pencil" size={16} color="#fff" />
               <Text style={styles.editButtonText}>Ubah Profil</Text>
             </TouchableOpacity>
-          </View>
-         
+          </View> 
         </View>
 
         <View style={styles.divider} />
@@ -80,10 +183,17 @@ const ProfileScreen = () => {
         <Text style={styles.sectionTitle}>Peliharaan Anda</Text>
         
         <View style={styles.petsRow}>
-          {petsRow1.map((pet, index) => (
+          {pets.map((pet, index) => (
             <View key={index} style={styles.petContainer}>
-              <Image source={pet.image} style={styles.petImage} />
-              <Text style={styles.petText}>{pet.name}</Text>
+              <Image 
+                source={
+                  pet.image 
+                    ? pet.image 
+                    : require('../../assets/asset-hidog.png') // default
+                } 
+                style={styles.petImage} 
+              />
+              <Text style={styles.petText}>{pet.pet_name}</Text>
             </View>
           ))}
           <TouchableOpacity style={styles.addButton} onPress={handleAddPet}>
@@ -95,10 +205,7 @@ const ProfileScreen = () => {
           {menuItems.map((item, index) => (
             <TouchableOpacity 
               key={index} 
-              style={[
-                styles.menuItem, 
-                index !== menuItems.length - 1 && styles.menuItemBorder
-              ]}
+              style={[styles.menuItem, index !== menuItems.length - 1 && styles.menuItemBorder]}
               onPress={() => handleMenuItemPress(item.title)}
             >
               <View style={styles.menuContent}>
@@ -208,28 +315,7 @@ const styles = StyleSheet.create({
     height: 60,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  addPetContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  addPetText: {
-    fontSize: 12,
-    color: '#333',
-  },
-  smallAddButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
+  }, 
   menuContainer: {
     marginTop: 8,
   },
