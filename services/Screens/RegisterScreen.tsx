@@ -52,14 +52,17 @@ export const RegisterScreen = ({ navigation }: Props): React.ReactElement => {
   setLoading(true);
   try {
     const apiUrl = "https://noahvetcare.naufalalfa.com/v1/api/user/register/customer";
-
+    console.log("Sending:", { username, email, password });
+    
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, email, password }),
+      body: JSON.stringify({ name: username, email, password }),
     });
 
     const data = await response.json();
+    console.log("Response status:", response.status);
+    console.log("Response data:", data); 
 
     if (!response.ok) {
       Alert.alert("Error", data.message || "Gagal melakukan pendaftaran.");

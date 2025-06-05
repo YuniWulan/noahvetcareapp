@@ -49,8 +49,8 @@ export const LoginScreen = ({ navigation }: Props) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            username: name,
-            password: password,
+            username: name.trim(),
+            password: password.trim(),
           }),
         }
       );
@@ -85,11 +85,12 @@ export const LoginScreen = ({ navigation }: Props) => {
 
       await AsyncStorage.setItem("token", token);
       await AsyncStorage.setItem("user", JSON.stringify(userData));
+      await AsyncStorage.setItem("user_id", user_id.toString());
 
       if (userData.is_doctor) {
         navigation.navigate("DoctorHome");
       } else {
-        navigation.navigate("CustomerHome");
+        navigation.navigate("MainTabs");
       }
     } catch (error: any) {
       Alert.alert("Error", error.message || "Terjadi kesalahan saat login.");

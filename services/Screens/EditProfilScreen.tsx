@@ -1,20 +1,100 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, SafeAreaView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';  
+import { RootStackParamList } from '../../App';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type EditProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'EditProfile'>;
 
 const EditProfileScreen = () => {
   const navigation = useNavigation<EditProfileScreenNavigationProp>();
-  const [username, setUsername] = useState('Bob Johnson Andreas');
-  const [email, setEmail] = useState('andreasbobj@gmail.com');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
 
-  const handleSave = () => {
-    console.log('Saved:', { username, email });
-    navigation.goBack();
+ useEffect(() => {
+    const fetchUserDetails = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        const storedUserId = await AsyncStorage.getItem('user_id');
+        if (!token || !storedUserId) throw new Error('Token atau User ID tidak ditemukan');
+
+        setUserId(storedUserId);
+
+        const response = await fetch(`https://noahvetcare.naufalalfa.com/v1/api/user/details/${storedUserId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) throw new Error('Gagal fetch data user');
+
+        const data = await response.json();
+        console.log('Data user di-fetch:', data);
+        setUsername(data.username || '');
+        setEmail(data.email || '');
+      } catch (err) {
+        console.error('Gagal ambil data user:', err);
+        Alert.alert('Error', 'Tidak dapat mengambil data pengguna');
+      }
+    };
+
+    fetchUserDetails();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      console.log('Data yang dikirim ke server:', {
+        username: username.trim(),
+        email: email.trim()
+      });
+
+      const token = await AsyncStorage.getItem('token');
+      const storedUserId = await AsyncStorage.getItem('user_id');
+      if (!token || !storedUserId) throw new Error('Token atau User ID tidak ditemukan');
+
+      const response = await fetch(`https://noahvetcare.naufalalfa.com/v1/api/user/update`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          email: email.trim()
+        }),
+      });
+
+      if (!response.ok) throw new Error('Update gagal');
+      
+      const updatedResult = await response.json();
+      console.log('Update berhasil, response API:', updatedResult);
+      if (!updatedResult.success) throw new Error('Update gagal (success = false)');
+
+      // Fetch data terbaru dari API
+      const userDetailsResponse = await fetch(`https://noahvetcare.naufalalfa.com/v1/api/user/details/${storedUserId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!userDetailsResponse.ok) throw new Error('Gagal mengambil ulang data user');
+
+      const updatedUserData = await userDetailsResponse.json();
+      console.log('Data user terbaru setelah update:', updatedUserData);
+
+      await AsyncStorage.setItem('user', JSON.stringify(updatedUserData));
+
+      Alert.alert('Sukses', 'Profil berhasil diperbarui');
+      navigation.goBack();
+    } catch (error) {
+      console.error('Error saat update:', error);
+      Alert.alert('Error', 'Gagal memperbarui profil');
+    }
   };
 
   return (

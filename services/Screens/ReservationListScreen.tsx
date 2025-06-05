@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';  
-
-
+import { RootStackParamList } from '../../App';
+import { RouteProp } from '@react-navigation/native';
+ 
 type ReservationListNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type RouteParams = {
+  newReservation?: ReservationItem;
+};
 
 type ReservationStatus = 'Terjadwal' | 'Menunggu' | 'Ditolak' | 'Selesai';
 
@@ -17,14 +20,14 @@ interface ReservationItem {
   date: string;
   time: string;
   status: ReservationStatus;
-  image: any; // Add image property
+  image: any;
 }
 
 const ReservationListScreen = () => {
   const navigation = useNavigation<ReservationListNavigationProp>();
-  const [activeTab, setActiveTab] = useState<'Reservasi' | 'Selesai'>('Reservasi');
+  const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
 
-  const allReservations: ReservationItem[] = [
+  const [allReservations, setAllReservations] = useState<ReservationItem[]>([
     {
       id: '1',
       petName: 'Savannah',
@@ -79,7 +82,29 @@ const ReservationListScreen = () => {
       status: 'Selesai',
       image: require('../../assets/dog4.jpg')
     },
-  ];
+  ]);
+
+  const [activeTab, setActiveTab] = useState<'Reservasi' | 'Selesai'>('Reservasi');
+
+  // Kalau navigasi balik dengan param newReservation, tambahkan ke list
+  useFocusEffect(
+  useCallback(() => {
+    if (route.params?.newReservation) {
+      const newRes = route.params.newReservation;
+      setAllReservations(prev => {
+        // Check if this reservation already exists
+        if (prev.some(r => r.id === newRes.id)) {
+          return prev;
+        }
+        // Add the new reservation at the beginning of the list
+        return [newRes, ...prev];
+      });    
+       if (route.params) {
+        navigation.setParams({ newReservation: undefined });
+      }
+    }
+  }, [route.params?.newReservation])
+);
 
   const filteredReservations = allReservations.filter(reservation => 
     activeTab === 'Reservasi' 
@@ -98,8 +123,7 @@ const ReservationListScreen = () => {
   };
 
   const handleAddReservation = () => {
-    navigation.navigate('Reservasi');
-    console.log('Add new reservation');
+    navigation.navigate('Reservasi'); 
   };
 
   return (
@@ -127,14 +151,12 @@ const ReservationListScreen = () => {
             </Text>
           </TouchableOpacity>
         </View>
-
-        {/* Add Reservation Button */}
+ 
         <TouchableOpacity style={styles.addButton} onPress={handleAddReservation}>
           <MaterialIcons name="add" size={24} color="white" />
           <Text style={styles.addButtonText}>Buat Reservasi Baru</Text>
         </TouchableOpacity>
-
-        {/* Reservation List */}
+ 
         <ScrollView style={styles.reservationList}>
           {filteredReservations.length === 0 ? (
             <View style={styles.emptyState}>
@@ -185,15 +207,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-  },
-  header: {
-    padding: 16,
-    alignItems: 'flex-end',
-  },
-  timeText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  }, 
   titleContainer: {
     paddingHorizontal: 16,
     paddingTop: 8,
@@ -287,19 +301,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  serviceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 14,
-    color: '#9E9E9E',
-  },
-  value: {
-    fontSize: 16,
-  },
-  reservationBottomRow: {
+  reservationBottomRow: { 
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -324,9 +326,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statusValue: {
+    fontWeight: 'bold',
     fontSize: 14,
-    fontWeight: '500',
-  },
+  }, 
 });
 
 export default ReservationListScreen;
