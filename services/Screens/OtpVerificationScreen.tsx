@@ -1,17 +1,9 @@
 import React, { useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Keyboard } from "react-native";
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';  
+
+console.log(require('react-native').TouchableOpacity);
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OtpVerification'>;
 
@@ -43,6 +35,7 @@ export const OtpVerificationScreen: React.FC<Props> = ({ navigation, route }) =>
     const code = otp.join("");
     if (code.length < otp.length || otp.some((digit) => digit === "")) {
       Alert.alert("Error", "Harap isi semua digit kode OTP.");
+      Keyboard.dismiss();
       return;
     }
 
