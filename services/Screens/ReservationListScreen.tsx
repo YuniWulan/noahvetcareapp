@@ -1,110 +1,371 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Image } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Image, RefreshControl, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'; 
 import { RouteProp } from '@react-navigation/native';
- 
-type ReservationListNavigationProp = NativeStackNavigationProp<RootStackParamList>;
-type RouteParams = {
-  newReservation?: ReservationItem;
-};
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Type definitions
 type ReservationStatus = 'Terjadwal' | 'Menunggu' | 'Ditolak' | 'Selesai';
 
 interface ReservationItem {
   id: string;
   petName: string;
-  gender: string;
+  doctorName: string;
   date: string;
   time: string;
   status: ReservationStatus;
+  notes?: string;
   image: any;
 }
 
+type RootStackParamList = {
+  ReservationList: {
+    shouldRefresh?: boolean;
+  };
+  ReservationDetail: {
+    reservationId: string;
+    reservationData: ReservationItem;
+  };
+  Reservasi: undefined;
+};
+
+type RouteParams = {
+  shouldRefresh?: boolean;
+};
+
+type ReservationListNavigationProp = NativeStackNavigationProp<RootStackParamList, 'ReservationList'>;
+type ReservationListRouteProp = RouteProp<{ params: RouteParams }, 'params'>;
+
+// API Configuration
+const API_BASE_URL = 'https://noahvetcare.naufalalfa.com/v1/api';
+
+// API service functions
+const appointmentAPI = {
+  getUserAppointments: async (userId: string) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/appointment/user/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error('Access forbidden. Please login again.');
+        }
+        if (response.status === 401) {
+          throw new Error('Authentication required. Please login again.');
+        }
+        throw new Error(`Failed to fetch appointments: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.appointments || [];
+    } catch (error) {
+      console.error('Error fetching user appointments:', error);
+      throw error;
+    }
+  },
+
+  getAppointmentDetails: async (appointmentId: string) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/appointment/details/${appointmentId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Appointment not found');
+        }
+        if (response.status === 403) {
+          throw new Error('Access forbidden');
+        }
+        if (response.status === 401) {
+          throw new Error('Authentication required');
+        }
+        throw new Error(`Failed to fetch appointment details: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching appointment details:', error);
+      throw error;
+    }
+  },
+
+  createAppointment: async (appointmentData: {
+    pet_id: number;
+    doctor_id: number;
+    date: string;
+    status: string;
+    notes: string;
+  }) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/appointment/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(appointmentData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to create appointment: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating appointment:', error);
+      throw error;
+    }
+  }
+};
+
+// Helper functions
+const formatDate = (dateString: string): string => {
+  if (!dateString) return 'Date not set';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Invalid date';
+    }
+    
+    const options: Intl.DateTimeFormatOptions = { 
+      weekday: 'long', 
+      month: 'short', 
+      day: 'numeric' 
+    };
+    return date.toLocaleDateString('en-US', options);
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Invalid date';
+  }
+};
+
+const formatTime = (dateString: string): string => {
+  if (!dateString) return 'Time not set';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Invalid time';
+    }
+    
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+    
+    return `${displayHour.toString().padStart(2, '0')}.${minutes.toString().padStart(2, '0')} ${ampm}`;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return 'Invalid time';
+  }
+};
+
+const mapStatus = (backendStatus: string): ReservationStatus => {
+  if (!backendStatus) return 'Menunggu';
+  
+  const statusMap: { [key: string]: ReservationStatus } = {
+    'Scheduled': 'Terjadwal',
+    'Pending': 'Menunggu', 
+    'Confirmed': 'Terjadwal',
+    'Completed': 'Selesai',
+    'Cancelled': 'Ditolak',
+    'Rejected': 'Ditolak',
+  };
+  
+  return statusMap[backendStatus] || 'Menunggu';
+};
+
+const getImageForPet = (petName: string): any => {
+  const images = [
+    require('../../assets/dog1.jpg'),
+    require('../../assets/dog2.jpg'),
+    require('../../assets/dog3.jpg'),
+    require('../../assets/dog4.jpg'),
+    require('../../assets/cat1.jpg'),
+  ];
+  
+  if (!petName) return images[0];
+  
+  // Simple hash for consistent image based on pet name
+  const hash = petName.split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0);
+  
+  return images[Math.abs(hash) % images.length];
+};
+
+// Transform backend data to frontend format
+const transformAppointmentData = (appointmentData: any): ReservationItem => {
+  return {
+    id: appointmentData.appointment_id?.toString() || Date.now().toString() + Math.random().toString(36).substr(2, 9),
+    petName: appointmentData.pet_name || 'Unknown Pet',
+    doctorName: appointmentData.doctor_name || 'Unknown Doctor',
+    date: formatDate(appointmentData.date),
+    time: formatTime(appointmentData.date),
+    status: mapStatus(appointmentData.status),
+    notes: appointmentData.notes || '',
+    image: getImageForPet(appointmentData.pet_name),
+  };
+};
+
+// Utility function to safely decode JWT token
+const decodeJWT = (token: string) => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload;
+  } catch (error) {
+    console.error('Error decoding JWT:', error);
+    return null;
+  }
+};
+
 const ReservationListScreen = () => {
   const navigation = useNavigation<ReservationListNavigationProp>();
-  const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
+  const route = useRoute<ReservationListRouteProp>();
 
-  const [allReservations, setAllReservations] = useState<ReservationItem[]>([
-    {
-      id: '1',
-      petName: 'Savannah',
-      gender: 'Female',
-      date: 'Tuesday, Dec 20',
-      time: '09.00 AM',
-      status: 'Terjadwal',
-      image: require('../../assets/dog1.jpg')
-    },
-    {
-      id: '2',
-      petName: 'Angel',
-      gender: 'Female',
-      date: 'Tuesday, Dec 20',
-      time: '09.00 AM',
-      status: 'Menunggu',
-      image: require('../../assets/dog2.jpg')
-    },
-    {
-      id: '3',
-      petName: 'Bembi',
-      gender: 'Female',
-      date: 'Tuesday, Dec 20',
-      time: '09.00 AM',
-      status: 'Terjadwal',
-      image: require('../../assets/cat1.jpg')
-    },
-    {
-      id: '4',
-      petName: 'Savannah',
-      gender: 'Female',
-      date: 'Tuesday, Dec 15',
-      time: '09.00 AM',
-      status: 'Ditolak',
-      image: require('../../assets/dog1.jpg')
-    },
-    {
-      id: '5',
-      petName: 'Raya',
-      gender: 'Female',
-      date: 'Monday, Dec 19',
-      time: '10.00 AM',
-      status: 'Selesai',
-      image: require('../../assets/dog3.jpg')
-    },
-    {
-      id: '6',
-      petName: 'Milo',
-      gender: 'Male',
-      date: 'Friday, Dec 16',
-      time: '02.00 PM',
-      status: 'Selesai',
-      image: require('../../assets/dog4.jpg')
-    },
-  ]);
-
+  const [userId, setUserId] = useState<string | null>(null);
+  const [allReservations, setAllReservations] = useState<ReservationItem[]>([]);
   const [activeTab, setActiveTab] = useState<'Reservasi' | 'Selesai'>('Reservasi');
+  const [isLoading, setIsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Kalau navigasi balik dengan param newReservation, tambahkan ke list
-  useFocusEffect(
-  useCallback(() => {
-    if (route.params?.newReservation) {
-      const newRes = route.params.newReservation;
-      setAllReservations(prev => {
-        // Check if this reservation already exists
-        if (prev.some(r => r.id === newRes.id)) {
-          return prev;
+  // Get user ID from token
+  useEffect(() => {
+    const fetchUserId = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (token) {
+          const payload = decodeJWT(token);
+          if (payload) {
+            setUserId(payload.user_id?.toString() || payload.id?.toString() || null);
+          } else {
+            throw new Error('Invalid token format');
+          }
+        } else {
+          throw new Error('No token found');
         }
-        // Add the new reservation at the beginning of the list
-        return [newRes, ...prev];
-      });    
-       if (route.params) {
-        navigation.setParams({ newReservation: undefined });
+      } catch (error) {
+        console.error('Error fetching user ID:', error);
+        Alert.alert('Authentication Error', 'Failed to get user information. Please login again.');
       }
+    };
+
+    fetchUserId();
+  }, []);
+
+  // Load reservations from backend
+  const loadReservations = useCallback(async (showLoading = true) => {
+    if (!userId) {
+      console.warn('No userId available for loading reservations');
+      return;
     }
-  }, [route.params?.newReservation])
-);
+
+    try {
+      if (showLoading) setIsLoading(true);
+      
+      const appointments = await appointmentAPI.getUserAppointments(userId);
+      const transformedReservations = appointments.map(transformAppointmentData);
+      
+      // Sort by date (newest first) - use the original date from backend for accurate sorting
+      transformedReservations.sort((a: any, b: any) => {
+        // You might need to store the original date for sorting
+        // For now, let's try to parse the formatted date
+        const parseFormattedDate = (dateStr: string, timeStr: string) => {
+          try {
+            // This is a simple approach - you might need to adjust based on your date format
+            return new Date(`${dateStr} ${timeStr}`).getTime();
+          } catch {
+            return 0;
+          }
+        };
+        
+        const dateA = parseFormattedDate(a.date, a.time);
+        const dateB = parseFormattedDate(b.date, b.time);
+        return dateB - dateA;
+      });
+      
+      // Replace all reservations with fresh data from API
+      setAllReservations(transformedReservations);
+      
+      console.log('Loaded reservations:', transformedReservations.length);
+    } catch (error) {
+      console.error('Error loading reservations:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load reservations. Please try again.';
+      
+      Alert.alert(
+        'Error', 
+        errorMessage,
+        [
+          { text: 'Retry', onPress: () => loadReservations() },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  }, [userId]);
+
+  // Pull to refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadReservations(false);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadReservations]);
+
+  // Load data when userId is available
+  useEffect(() => {
+    if (userId) {
+      loadReservations();
+    }
+  }, [userId, loadReservations]);
+
+  // Handle focus effect and navigation params
+  useFocusEffect(
+    useCallback(() => {
+      // Always refresh data when screen comes into focus
+      // This ensures we get the latest data from the server
+      if (userId && route.params?.shouldRefresh) {
+        console.log('Refreshing due to shouldRefresh param');
+        loadReservations(false);
+        
+        // Clear the param to prevent infinite refresh
+        navigation.setParams({ shouldRefresh: undefined });
+      }
+    }, [route.params?.shouldRefresh, loadReservations, navigation, userId])
+  );
 
   const filteredReservations = allReservations.filter(reservation => 
     activeTab === 'Reservasi' 
@@ -125,6 +386,38 @@ const ReservationListScreen = () => {
   const handleAddReservation = () => {
     navigation.navigate('Reservasi'); 
   };
+
+  const handleReservationPress = async (reservation: ReservationItem) => {
+    try {
+      // Show loading feedback
+      // You might want to add a loading state here
+      
+      // Fetch detailed appointment data
+      const details = await appointmentAPI.getAppointmentDetails(reservation.id);
+      
+      // Navigate to detail screen with complete data
+      navigation.navigate('ReservationDetail', { 
+        reservationId: reservation.id,
+        reservationData: { ...reservation, ...details }
+      });
+    } catch (error) {
+      console.error('Error fetching reservation detail:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load reservation details';
+      Alert.alert('Error', errorMessage);
+    }
+  };
+
+  // Show loading if no userId yet
+  if (!userId) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={[styles.container, styles.centerContent]}>
+          <MaterialIcons name="refresh" size={32} color="#2196F3" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -157,13 +450,39 @@ const ReservationListScreen = () => {
           <Text style={styles.addButtonText}>Buat Reservasi Baru</Text>
         </TouchableOpacity>
  
-        <ScrollView style={styles.reservationList}>
-          {filteredReservations.length === 0 ? (
+        <ScrollView 
+          style={styles.reservationList}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#2196F3']}
+              tintColor="#2196F3"
+            />
+          }
+        >
+          {isLoading && allReservations.length === 0 ? (
+            <View style={styles.loadingState}>
+              <MaterialIcons name="refresh" size={32} color="#2196F3" />
+              <Text style={styles.loadingText}>Loading reservations...</Text>
+            </View>
+          ) : filteredReservations.length === 0 ? (
             <View style={styles.emptyState}>
+              <MaterialIcons 
+                name="event-note" 
+                size={64} 
+                color="#E0E0E0" 
+                style={styles.emptyIcon}
+              />
               <Text style={styles.emptyStateText}>
                 {activeTab === 'Reservasi' 
                   ? 'Tidak ada reservasi aktif' 
                   : 'Tidak ada reservasi selesai'}
+              </Text>
+              <Text style={styles.emptyStateSubtext}>
+                {activeTab === 'Reservasi' 
+                  ? 'Buat reservasi baru untuk memulai' 
+                  : 'Reservasi yang selesai akan muncul di sini'}
               </Text>
             </View>
           ) : (
@@ -171,13 +490,21 @@ const ReservationListScreen = () => {
               <TouchableOpacity 
                 key={item.id} 
                 style={styles.reservationCard}
+                onPress={() => handleReservationPress(item)}
+                activeOpacity={0.7}
               >
                 <View style={styles.reservationTopRow}>
                   <Image source={item.image} style={styles.reservationImage} />
                   <View style={styles.reservationTextContainer}>
                     <Text style={styles.reservationName}>{item.petName}</Text>
-                    <Text style={styles.reservationGender}>{item.gender}</Text>
+                    <Text style={styles.doctorName}>Dr. {item.doctorName}</Text>
+                    {item.notes && (
+                      <Text style={styles.reservationNotes} numberOfLines={1}>
+                        {item.notes}
+                      </Text>
+                    )}
                   </View>
+                  <MaterialIcons name="chevron-right" size={24} color="#BDBDBD" />
                 </View>
                 
                 <View style={styles.reservationBottomRow}>
@@ -186,9 +513,11 @@ const ReservationListScreen = () => {
                     <Text style={styles.reservationTime}>{item.time}</Text>
                   </View>
                   <View style={styles.statusContainer}>
-                    <Text style={[styles.statusValue, { color: getStatusColor(item.status) }]}>
-                      {item.status}
-                    </Text>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+                      <Text style={[styles.statusValue, { color: getStatusColor(item.status) }]}>
+                        {item.status}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -207,7 +536,11 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-  }, 
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   titleContainer: {
     paddingHorizontal: 16,
     paddingTop: 8,
@@ -258,14 +591,34 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
   },
+  loadingState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#9E9E9E',
+    marginTop: 12,
+  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 40,
   },
+  emptyIcon: {
+    marginBottom: 16,
+  },
   emptyStateText: {
     fontSize: 16,
     color: '#9E9E9E',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#BDBDBD',
+    textAlign: 'center',
   },
   reservationCard: {
     backgroundColor: '#fff',
@@ -297,9 +650,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  reservationGender: {
+  doctorName: {
     fontSize: 14,
+    color: '#2196F3',
+    fontWeight: '500',
+  },
+  reservationNotes: {
+    fontSize: 12,
     color: '#666',
+    marginTop: 2,
+    fontStyle: 'italic',
   },
   reservationBottomRow: { 
     flexDirection: 'row',
@@ -325,10 +685,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
   statusValue: {
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 12,
   }, 
 });
 
-export default ReservationListScreen;
+export default ReservationListScreen; 

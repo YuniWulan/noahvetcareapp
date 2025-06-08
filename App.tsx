@@ -103,16 +103,17 @@ export type RootStackParamList = {
   MainTabs: undefined;
   Reservasi: undefined;
   ReservationList?: {
-    newReservation?: {
-      id: string;
-      petName: string;
-      gender: string;
-      date: string;
-      time: string;
-      status: string;
-      image: any;
-    };
+  newReservation?: {
+    id: string;
+    petName: string | undefined;
+    gender: string;
+    date: string;
+    time: string;
+    status: string;
+    image: any;
   };
+  shouldRefresh?: boolean;
+};
   Transaction: undefined;
   ReservationSuccess: { appointmentId: number };
   Profile: { refresh?: boolean } | undefined;
@@ -151,4 +152,4 @@ export default function App() {
       </Stack.Navigator>
     </NavigationContainer>
   );
-}
+} 
