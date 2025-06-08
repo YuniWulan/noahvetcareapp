@@ -1,30 +1,448 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ImageBackground } from 'react-native';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  Image, 
+  ImageBackground, 
+  Alert,
+  RefreshControl,
+  ActivityIndicator 
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';  
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RootStackParamList } from '../../App';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-type TabParamList = {
-  Home: undefined;
-  ReservationList: undefined;
-  Transaction: undefined;
-  Profile: undefined;
+interface Pet {
+  id: string;
+  name: string;
+  type: string;
+  breed: string;
+  age: number;
+  image: any;
+}
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  is_doctor: boolean;
+  speciality: string | null;
+  phone: string | null;
+}
+
+interface Reservation {
+  id: string;
+  petName: string;
+  gender: string;
+  date: string;
+  time: string;
+  status: string;
+  image: any;
+}
+
+interface ApiResponse<T> {
+  success?: boolean;
+  data?: T;
+  message?: string;
+}
+
+const HomeScreen: React.FC = () => {
+  const navigation = useNavigation<HomeScreenNavigationProp>();
+  
+  // API Configuration
+  const API_BASE_URL = 'https://noahvetcare.naufalalfa.com';
+  const API_TIMEOUT = 10000; // 10 seconds
+
+  // State management
+  const [user, setUser] = useState<User | null>(null);
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Enhanced fetch function with timeout and better error handling
+  const fetchWithTimeout = async (url: string, options: RequestInit, timeout = API_TIMEOUT): Promise<Response> => {
+    console.log('🌐 Fetching URL:', url);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ Request timeout for URL:', url);
+      controller.abort();
+    }, timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response OK:', response.ok);
+
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      console.error('❌ Fetch error for URL:', url, error);
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timeout');
+      }
+      throw error;
+    }
+  };
+
+  // Secure token management
+  const getAuthToken = async (): Promise<string | null> => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      console.log('🔑 Auth token retrieved:', token ? 'Token exists' : 'No token found');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  };
+
+  const getUserId = async (): Promise<string | null> => {
+    try {
+      const userId = await AsyncStorage.getItem('user_id');
+      console.log('👤 User ID retrieved:', userId);
+      return userId;
+    } catch (error) {
+      console.error('Error getting user ID:', error);
+      return null;
+    }
+  };
+
+  // Enhanced user data fetching
+  const fetchUserData = async (): Promise<User | null> => {
+    console.log('👤 Starting fetchUserData...');
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const userId = await AsyncStorage.getItem('user_id');
+      
+      console.log('👤 Credentials check - Token:', !!token, 'UserId:', userId);
+      if (!token || !userId) {
+        console.log('⚠️ Missing auth credentials');
+        throw new Error('Authentication credentials not found');
+      }
+
+      const response = await fetchWithTimeout(`${API_BASE_URL}/v1/api/user/details/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.error('❌ User API response not OK:', response.status, response.statusText);
+        throw new Error(`HTTP Error: ${response.status}`);
+      }
+
+      const responseText = await response.text();
+      console.log('📄 Raw user response:', responseText);
+
+      let userData: any;
+      try {
+        userData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON Parse error for user data:', parseError);
+        throw new Error('Invalid JSON response from user API');
+      }
+
+      console.log('👤 Parsed user data:', JSON.stringify(userData, null, 2));
+      
+      // Handle different response structures
+      let user: User | null = null;
+      
+      if (userData.success && userData.data) {
+        user = userData.data;
+      } else if (userData.data) {
+        user = userData.data;
+      } else if ('id' in userData) {
+        user = userData as User;
+      }
+
+      if (!user || !user.id) {
+        throw new Error('Invalid user data structure');
+      }
+
+      // Normalize user data
+      return {
+        id: user.id,
+        name: user.name || user.username || 'User',
+        email: user.email || '',
+        username: user.username || user.name || 'user',
+        is_doctor: user.is_doctor || false,
+        speciality: user.speciality || null,
+        phone: user.phone || null,
+      };
+
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      throw error;
+    }
+  };
+
+  // Enhanced pets data fetching with better logging
+  const fetchPetsData = async (): Promise<Pet[]> => {
+  console.log('🐾 Starting fetchPetsData...');
+  try {
+    const token = await getAuthToken();
+    const userId = await getUserId();
+    
+    if (!token || !userId) {
+      throw new Error('Authentication credentials not found');
+    }
+
+    const response = await fetchWithTimeout(`${API_BASE_URL}/v1/api/pet/lists/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("API result:", data);
+    
+    // Handle the response structure from ProfileScreen
+    let pets: any[] = [];
+    if (data.petData && Array.isArray(data.petData)) {
+      pets = data.petData;
+    } else if (data.data && Array.isArray(data.data)) {
+      pets = data.data;
+    } else if (Array.isArray(data)) {
+      pets = data;
+    }
+
+    console.log(`🐾 Found ${pets.length} pets`);
+
+      // Transform and validate pet data
+     const transformedPets = pets.map((pet: any, index: number) => {
+      return {
+        id: (pet.id || pet.pet_id || `pet_${index}`).toString(),
+        name: pet.name || pet.pet_name || `Pet ${index + 1}`,
+        pet_name: pet.pet_name || pet.name || `Pet ${index + 1}`, // Keep both for compatibility
+        type: pet.type || pet.pet_type || pet.species || 'Unknown',
+        breed: pet.breed || pet.pet_breed || 'Unknown',
+        age: Math.max(0, parseInt(pet.age || pet.pet_age || '0') || 0),
+        image: pet.image || require('../../assets/asset-hidog.png'), // Use pet.image or default
+      };
+    });
+
+    return transformedPets;
+
+  } catch (error) {
+    console.error('Error fetching pets data:', error);
+    // Return empty array instead of mock data to match ProfileScreen behavior
+    return [];
+  }
 };
 
-const HomeScreen = () => {
-  const navigation = useNavigation<HomeScreenNavigationProp>();
-  const pets = [
-    { name: 'Arthur', image: require('../../assets/dog2.jpg') },
-    { name: 'Angel', image: require('../../assets/dog1.jpg') },
-    { name: 'Mitchell', image: require('../../assets/dog3.jpg') },
-    { name: 'Bembi', image: require('../../assets/cat1.jpg') },
-    { name: 'Ronald', image: require('../../assets/dog4.jpg') }
+  // Enhanced reservations data fetching with better logging
+  const fetchReservationsData = async (): Promise<Reservation[]> => {
+    console.log('📅 Starting fetchReservationsData...');
+    try {
+      const token = await getAuthToken();
+      const userId = await getUserId();
+      
+      if (!token || !userId) {
+        throw new Error('Authentication credentials not found');
+      }
+
+      // Updated to use the appointment API endpoint from paste.txt
+      const response = await fetchWithTimeout(`${API_BASE_URL}/v1/api/appointment/user/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error('Access forbidden. Please login again.');
+        }
+        if (response.status === 401) {
+          throw new Error('Authentication required. Please login again.');
+        }
+        throw new Error(`Failed to fetch appointments: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('📄 Raw appointments response:', data);
+      
+      // Handle the appointments response structure
+      let appointments: any[] = [];
+      if (data.appointments && Array.isArray(data.appointments)) {
+        appointments = data.appointments;
+      } else if (Array.isArray(data)) {
+        appointments = data;
+      } else if (data.data && Array.isArray(data.data)) {
+        appointments = data.data;
+      }
+
+      console.log(`📅 Found ${appointments.length} appointments`);
+
+      // Transform appointments to reservations format
+      const transformedReservations = appointments.map((appointment: any, index: number) => {
+        console.log(`📅 Processing appointment ${index}:`, JSON.stringify(appointment, null, 2));
+        
+        return {
+          id: (appointment.id || appointment.appointment_id || `res_${index}`).toString(),
+          petName: appointment.pet_name || appointment.petName || 'Unknown Pet',
+          gender: appointment.pet_gender || appointment.gender || 'Unknown',
+          date: formatDate(appointment.date || appointment.appointment_date || new Date().toISOString()),
+          time: formatTime(appointment.date || appointment.appointment_date || '09:00'),
+          status: mapStatus(appointment.status || 'Pending'),
+          image: getPetImageByGender(appointment.pet_gender || appointment.gender || 'male'),
+          doctorName: appointment.doctor_name || appointment.doctorName,
+          notes: appointment.notes || '',
+        };
+      });
+
+      return transformedReservations;
+
+    } catch (error) {
+      console.error('Error fetching appointments data:', error);
+      
+      // Handle specific authentication errors
+      if (error instanceof Error) {
+        if (error.message.includes('Authentication required') || error.message.includes('Access forbidden')) {
+          Alert.alert(
+            'Session Expired',
+            'Your session has expired. Please login again.',
+            [
+              {
+                text: 'Login',
+                onPress: () => {
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Login' }],
+                  });
+                }
+              }
+            ]
+          );
+        }
+      }
+      
+      return [];
+    }
+  };
+
+
+  // Helper functions
+  const getPetImageByType = (type?: string) => {
+    if (!type) return require('../../assets/dog1.jpg');
+    
+    const petType = type.toLowerCase();
+    if (petType.includes('cat')) {
+      return require('../../assets/cat1.jpg');
+    } else if (petType.includes('dog')) {
+      return require('../../assets/dog1.jpg');
+    }
+    return require('../../assets/dog1.jpg');
+  };
+
+  const getPetImageByGender = (gender: string) => {
+    const genderLower = gender.toLowerCase();
+    if (genderLower.includes('female')) {
+      return require('../../assets/dog2.jpg');
+    }
+    return require('../../assets/dog1.jpg');
+  };
+
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return dateString;
+      }
+      
+      const options: Intl.DateTimeFormatOptions = { 
+        weekday: 'long', 
+        month: 'short', 
+        day: 'numeric' 
+      };
+      return date.toLocaleDateString('id-ID', options);
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatTime = (timeString: string): string => {
+    try {
+      if (timeString.includes(':')) {
+        const [hours, minutes] = timeString.split(':');
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+        return `${displayHour.toString().padStart(2, '0')}.${minutes} ${ampm}`;
+      }
+      return timeString;
+    } catch {
+      return timeString;
+    }
+  };
+
+  const mapStatus = (status: string): string => {
+    const statusMap: Record<string, string> = {
+      'completed': 'Selesai',
+      'selesai': 'Selesai',
+      'scheduled': 'Terjadwal', 
+      'confirmed': 'Terjadwal',
+      'terjadwal': 'Terjadwal',
+      'pending': 'Menunggu',
+      'menunggu': 'Menunggu',
+      'cancelled': 'Ditolak',
+      'ditolak': 'Ditolak',
+    };
+    
+    return statusMap[status.toLowerCase()] || 'Menunggu';
+  };
+
+  const getStatusColor = (status: string): string => {
+    const colorMap: Record<string, string> = {
+      'Selesai': '#4CAF50',
+      'Terjadwal': '#2196F3',
+      'Menunggu': '#FFC107',
+      'Ditolak': '#F44336',
+    };
+    
+    return colorMap[status] || '#9E9E9E';
+  };
+
+  // Mock data for fallback (reduced for testing)
+  const getMockPetsData = (): Pet[] => [
+    { 
+      id: '1',
+      name: 'Arthur', 
+      type: 'Dog',
+      breed: 'Golden Retriever',
+      age: 3,
+      image: require('../../assets/dog2.jpg') 
+    }
   ];
-  
-  const reservations = [
+
+  const getMockReservationsData = (): Reservation[] => [
     {
       id: '1',
       petName: 'Savannah',
@@ -33,45 +451,202 @@ const HomeScreen = () => {
       time: '09.00 AM',
       status: 'Terjadwal',
       image: require('../../assets/dog1.jpg')
-    },
-    {
-      id: '2',
-      petName: 'Angel',
-      gender: 'Female',
-      date: 'Wednesday, Dec 21',
-      time: '10.30 AM',
-      status: 'Menunggu',
-      image: require('../../assets/dog2.jpg')
-    },
-    {
-      id: '3',
-      petName: 'Bembi',
-      gender: 'Female',
-      date: 'Thursday, Dec 22',
-      time: '02.15 PM',
-      status: 'Terjadwal',
-      image: require('../../assets/cat1.jpg')
     }
   ];
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Selesai': return '#4CAF50';
-      case 'Terjadwal': return '#2196F3';
-      case 'Menunggu': return '#FFC107';
-      case 'Ditolak': return '#F44336';
-      default: return '#9E9E9E';
+  // Main data loading function with better error handling
+  const loadAllData = useCallback(async (isRefresh = false) => {
+    try {
+      if (!isRefresh) {
+        setLoading(true);
+      }
+      setError(null);
+      
+      const token = await getAuthToken();
+      const userId = await getUserId();
+      
+      console.log('🔧 LoadAllData - Credentials check:');
+      console.log('- Token exists:', !!token);
+      console.log('- Token length:', token?.length || 0);
+      console.log('- UserId:', userId);
+      
+      if (!token || !userId) {
+        console.log('⚠️ Missing auth credentials, redirecting to login...');
+        
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please login again.',
+          [
+            {
+              text: 'Login',
+              onPress: () => {
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Login' }],
+                });
+              }
+            }
+          ]
+        );
+        return;
+      }
+      
+      // Load all data concurrently
+      console.log('🔧 Starting concurrent data fetch...');
+      const [userData, petsData, reservationsData] = await Promise.allSettled([
+        fetchUserData(),
+        fetchPetsData(),
+        fetchReservationsData()
+      ]);
+
+      console.log('📊 API Results:');
+      console.log('- User data:', userData.status);
+      console.log('- Pets data:', petsData.status);
+      console.log('- Reservations data:', reservationsData.status);
+
+      // Handle user data
+      if (userData.status === 'fulfilled' && userData.value) {
+        console.log('✅ Setting user data:', userData.value);
+        setUser(userData.value);
+      } else {
+        console.log('❌ User data failed:', userData.status === 'rejected' ? userData.reason : 'No data');
+        setUser({
+          id: 1,
+          name: 'Pengguna',
+          email: '',
+          username: 'Pengguna',
+          is_doctor: false,
+          speciality: null,
+          phone: null,
+        });
+      }
+      
+      // Handle pets data
+      if (petsData.status === 'fulfilled') {
+        console.log('✅ Setting pets data:', petsData.value);
+        // Always show API data if available, otherwise show mock data
+        setPets(petsData.value.length > 0 ? petsData.value : getMockPetsData());
+      } else {
+        console.log('❌ Pets data failed:', petsData.status === 'rejected' ? petsData.reason : 'No data');
+        setPets(getMockPetsData());
+      }
+      
+      // Handle reservations data
+      if (reservationsData.status === 'fulfilled') {
+        console.log('✅ Setting reservations data:', reservationsData.value);
+        // Always show API data if available, otherwise show mock data
+        setReservations(reservationsData.value.length > 0 ? reservationsData.value : getMockReservationsData());
+      } else {
+        console.log('❌ Reservations data failed:', reservationsData.status === 'rejected' ? reservationsData.reason : 'No data');
+        setReservations(getMockReservationsData());
+      }
+      
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setError(error instanceof Error ? error.message : 'Unknown error occurred');
+      
+      // Fallback to mock data only if there's a critical error
+      setUser({
+        id: 1,
+        name: 'Pengguna',
+        email: '',
+        username: 'Pengguna',
+        is_doctor: false,
+        speciality: null,
+        phone: null,
+      });
+      setPets(getMockPetsData());
+      setReservations(getMockReservationsData());
+      
+    } finally {
+      setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      }
     }
-  };
+  }, [navigation]);
+
+  // Initial data loading
+  useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
+
+  // Event handlers
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadAllData(true);
+  }, [loadAllData]);
+
+  const handlePetPress = useCallback((pet: Pet) => {
+    console.log('Pet selected:', pet);
+    // navigation.navigate('PetDetail', { petId: pet.id });
+  }, []);
+
+  const handleReservationPress = useCallback((reservation: Reservation) => {
+    console.log('Reservation selected:', reservation);
+    // navigation.navigate('ReservationDetail', { reservationId: reservation.id });
+  }, []);
+
+  const handleReservationButton = useCallback(() => {
+    navigation.navigate('Reservasi');
+  }, [navigation]);
+
+  const handleViewReservations = useCallback(() => {
+    navigation.navigate('ReservationList');
+  }, [navigation]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (!loading) {
+        loadAllData(true);
+      }
+    }, [loading, loadAllData])
+  );
+
+  // Loading state
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#2196F3" />
+        <Text style={styles.loadingText}>Memuat data...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={['#2196F3']}
+          />
+        }
+      >
+        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerText}>Hallo, Bob!</Text>
-          <Text style={styles.subHeaderText}>Jangan lupa cek-up peliharaanmu!</Text>
+          <View style={styles.headerContent}>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerText}>
+                Hallo, {user?.name || user?.username || 'Pengguna'}!
+              </Text>
+              <Text style={styles.subHeaderText}>
+                {user?.is_doctor ? 'Selamat datang kembali, Dokter!' : 'Jangan lupa cek-up peliharaanmu!'}
+              </Text>
+              {user?.is_doctor && user?.speciality && (
+                <Text style={styles.specialityText}>Spesialisasi: {user.speciality}</Text>
+              )}
+              {error && (
+                <Text style={styles.errorText}>⚠️ {error}</Text>
+              )}
+            </View>
+          </View>
         </View>
 
+        {/* Hero Section */}
         <ImageBackground 
           source={require('../../assets/hero-image.png')}
           style={styles.heroBackground}
@@ -87,74 +662,107 @@ const HomeScreen = () => {
             </Text>
             <TouchableOpacity 
               style={styles.heroButton}
-              onPress={() => navigation.navigate('Reservasi')}
+              onPress={handleReservationButton}
+              activeOpacity={0.8}
             >
               <Text style={styles.heroButtonText}>Reservasi sekarang</Text>
             </TouchableOpacity>
           </View>
         </ImageBackground>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Peliharaan Anda</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.petsContainer}
+      <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Peliharaan Anda</Text>
+    {pets.length > 0 ? (
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.petsContainer}
+      >
+        {pets.map((pet) => (
+          <TouchableOpacity 
+            key={pet.id} 
+            style={styles.petCard}
+            onPress={() => handlePetPress(pet)}
+            activeOpacity={0.8}
           >
-            {pets.map((pet, index) => (
-              <TouchableOpacity key={index} style={styles.petCard}>
-                <Image source={pet.image} style={styles.petImage} />
-                <Text style={styles.petName}>{pet.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+            <Image source={pet.image} style={styles.petImage} />
+            <Text style={styles.petName} numberOfLines={1}>{pet.name}</Text>
+            <Text style={styles.petType} numberOfLines={1}>{pet.type}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    ) : (
+      <View style={styles.emptyContainer}>
+        <MaterialIcons name="pets" size={48} color="#ccc" />
+        <Text style={styles.emptyText}>Belum ada peliharaan</Text>
+        <TouchableOpacity 
+          style={styles.addPetButton}
+          onPress={() => console.log('Add pet pressed')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.addPetButtonText}>Tambah Peliharaan</Text>
+        </TouchableOpacity>
+      </View>
+    )}
+  </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Reservasi</Text>
-            <TouchableOpacity 
-              style={styles.lihatButton}
-              onPress={() => navigation.navigate('ReservationList')}
-            >
-              <Text style={styles.lihatButtonText}>Lihat</Text>
-            </TouchableOpacity>
-          </View>
+  {/* Reservations Section */}
+  <View style={styles.section}>
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>Reservasi</Text>
+      <TouchableOpacity 
+        style={styles.ViewAllButton}
+        onPress={handleViewReservations}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.ViewAllButtonText}>Lihat Semua</Text>
+      </TouchableOpacity>
+    </View>
+  
+    {reservations.length > 0 ? (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.reservationsContainer}
+      >
+        {reservations.map((reservation) => (
+          <TouchableOpacity 
+            key={reservation.id} 
+            style={styles.reservationCard}
+            onPress={() => handleReservationPress(reservation)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.reservationTopRow}>
+              <Image source={reservation.image} style={styles.reservationImage} />
+              <View style={styles.reservationInfo}>
+                <Text style={styles.reservationName} numberOfLines={1}>{reservation.petName}</Text>
+                <Text style={styles.reservationGender}>{reservation.gender}</Text>
+              </View>
+            </View>
           
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.reservationsContainer}
-          >
-            {reservations.map((reservation) => (
-              <TouchableOpacity 
-                key={reservation.id} 
-                style={styles.reservationCard}
-              >
-                <View style={styles.reservationTopRow}>
-                  <Image source={reservation.image} style={styles.reservationImage} />
-                  <View style={styles.reservationTextContainer}>
-                    <Text style={styles.reservationName}>{reservation.petName}</Text>
-                    <Text style={styles.reservationGender}>{reservation.gender}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.reservationBottomRow}>
-                  <View style={styles.datetimeContainer}>
-                    <Text style={styles.reservationDate}>{reservation.date}</Text>
-                    <Text style={styles.reservationTime}>{reservation.time}</Text>
-                  </View>
-                  <View style={styles.statusContainer}>
-                    <Text style={[styles.statusValue, { color: getStatusColor(reservation.status) }]}>
-                      {reservation.status}
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+            <View style={styles.reservationBottomRow}>
+              <View style={styles.datetimeContainer}>
+                <Text style={styles.reservationDate} numberOfLines={1}>{reservation.date}</Text>
+                <Text style={styles.reservationTime}>{reservation.time}</Text>
+              </View>
+              <View style={styles.statusContainer}>
+                <Text style={[styles.statusValue, { color: getStatusColor(reservation.status) }]}>
+                  {reservation.status}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    ) : (
+      <View style={styles.emptyContainer}>
+        <MaterialIcons name="event-note" size={48} color="#ccc" />
+        <Text style={styles.emptyText}>Belum ada reservasi</Text>
+      </View>
+    )}
+  </View>
 
+        {/* Doctors Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Dokter Tersedia</Text>
           <View style={styles.doctorsContainer}>
@@ -175,12 +783,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
   scrollContent: {
     paddingBottom: 20,
   },
   header: {
     padding: 20,
     paddingTop: 40,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   headerText: {
     fontSize: 24,
@@ -192,18 +817,15 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
-  heroContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#E3F2FD',
-    borderRadius: 12,
-    padding: 20,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    alignItems: 'center',
+  specialityText: {
+    fontSize: 14,
+    color: '#2196F3',
+    marginTop: 4,
+    fontWeight: '500',
   },
-  heroTextContainer: {
-    flex: 1,
-    marginRight: 10,
+  logoutButton: {
+    padding: 8,
+    marginLeft: 16,
   },
   heroBackground: {
     height: 220,
@@ -230,7 +852,7 @@ const styles = StyleSheet.create({
   },
   heroDescription: {
     fontSize: 14,
-    fontWeight: 500,
+    fontWeight: '500',
     color: '#333',
     marginTop: 8,
     marginBottom: 16,
@@ -250,11 +872,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
-  },
-  heroImage: {
-    width: 200,
-    height: 'auto',
-  },
+  }, 
   section: {
     marginHorizontal: 20,
     marginBottom: 24,
@@ -271,11 +889,11 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 16,
   },
-  lihatButton: {
+  ViewAllButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  lihatButtonText: {
+  ViewAllButtonText: {
     color: '#2196F3',
     fontWeight: 'bold',
   },
@@ -297,6 +915,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  petType: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  emptyPetsContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyPetsText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 16,
+  },
+  addPetButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  addPetButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   reservationsContainer: {
     flexDirection: 'row',
@@ -325,7 +979,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginRight: 12,
   },
-  reservationTextContainer: {
+  reservationInfo: {
     flex: 1,
   },
   reservationName: {
@@ -384,6 +1038,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 4,
+  },
+  errorText: {
+    color: 'red',
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
   },
 });
 
