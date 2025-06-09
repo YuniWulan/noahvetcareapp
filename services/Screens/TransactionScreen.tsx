@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 type TransactionItem = {
@@ -51,6 +51,7 @@ const TransactionScreen = () => {
   };
 
   return (
+    <SafeAreaView style={styles.safeArea}>
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText}>Transaction</Text>
@@ -91,17 +92,23 @@ const TransactionScreen = () => {
         ))}
       </ScrollView>
     </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff'
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    marginTop: 32,
   },
   header: {
-    paddingVertical: 20,
     paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   headerText: {
     fontSize: 24,
@@ -119,7 +126,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 16,
     gap: 8,
   },
   activeTab: {
@@ -127,7 +134,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#2196F3',
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#9E9E9E',
     fontWeight: '500',
   },
@@ -140,11 +147,15 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   transactionCard: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   transactionNumber: {
     fontSize: 16,

@@ -10,6 +10,9 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  SafeAreaView,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -263,16 +266,16 @@ export default function Reservasi() {
       }
 
       Alert.alert('Sukses', 'Appointment berhasil dibuat', [
-    {
-      text: 'OK',
-       onPress: () => {
-        navigation.navigate('MainTabs', { 
-        screen: 'ReservationList',
-        params: { shouldRefresh: true }
-      });
-    }
-  }
-]);
+        {
+          text: 'OK',
+          onPress: () => {
+            (navigation as any).navigate('MainTabs', { 
+              screen: 'ReservationList',
+              params: { shouldRefresh: true }
+            });
+          }
+        }
+      ]);
 
       const newReservation = {
         id: data.appointment_id.toString(),
@@ -370,6 +373,11 @@ export default function Reservasi() {
   };
 
   return (
+  <SafeAreaView style={styles.safeArea}>
+    <KeyboardAvoidingView 
+      style={styles.keyboardAvoidingView}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -478,18 +486,31 @@ export default function Reservasi() {
         </TouchableOpacity>
       </ScrollView>
     </View>
+    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#fff',
+    marginTop: 48,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
-    paddingTop: 40,
     paddingBottom: 10,
-    backgroundColor: '#f2f2f2',
+    backgroundColor: '#fff',
     justifyContent: 'space-between',
   }, 
   backButton: {
@@ -705,12 +726,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   timeItem: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#ccc',
-    marginRight: 10,
+    marginRight: 14,
     marginBottom: 10,
   },
   selectedTimeItem: {

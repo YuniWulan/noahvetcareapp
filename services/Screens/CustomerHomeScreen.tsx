@@ -26,7 +26,6 @@ interface Pet {
   type: string;
   breed: string;
   age: number;
-  image: any;
 }
 
 interface User {
@@ -46,7 +45,6 @@ interface Reservation {
   date: string;
   time: string;
   status: string;
-  image: any;
 }
 
 interface ApiResponse<T> {
@@ -243,7 +241,6 @@ const HomeScreen: React.FC = () => {
         type: pet.type || pet.pet_type || pet.species || 'Unknown',
         breed: pet.breed || pet.pet_breed || 'Unknown',
         age: Math.max(0, parseInt(pet.age || pet.pet_age || '0') || 0),
-        image: pet.image || require('../../assets/asset-hidog.png'), // Use pet.image or default
       };
     });
 
@@ -312,7 +309,6 @@ const HomeScreen: React.FC = () => {
           date: formatDate(appointment.date || appointment.appointment_date || new Date().toISOString()),
           time: formatTime(appointment.date || appointment.appointment_date || '09:00'),
           status: mapStatus(appointment.status || 'Pending'),
-          image: getPetImageByGender(appointment.pet_gender || appointment.gender || 'male'),
           doctorName: appointment.doctor_name || appointment.doctorName,
           notes: appointment.notes || '',
         };
@@ -348,27 +344,6 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-
-  // Helper functions
-  const getPetImageByType = (type?: string) => {
-    if (!type) return require('../../assets/dog1.jpg');
-    
-    const petType = type.toLowerCase();
-    if (petType.includes('cat')) {
-      return require('../../assets/cat1.jpg');
-    } else if (petType.includes('dog')) {
-      return require('../../assets/dog1.jpg');
-    }
-    return require('../../assets/dog1.jpg');
-  };
-
-  const getPetImageByGender = (gender: string) => {
-    const genderLower = gender.toLowerCase();
-    if (genderLower.includes('female')) {
-      return require('../../assets/dog2.jpg');
-    }
-    return require('../../assets/dog1.jpg');
-  };
 
   const formatDate = (dateString: string): string => {
     try {
@@ -438,7 +413,6 @@ const HomeScreen: React.FC = () => {
       type: 'Dog',
       breed: 'Golden Retriever',
       age: 3,
-      image: require('../../assets/dog2.jpg') 
     }
   ];
 
@@ -450,7 +424,6 @@ const HomeScreen: React.FC = () => {
       date: 'Tuesday, Dec 20',
       time: '09.00 AM',
       status: 'Terjadwal',
-      image: require('../../assets/dog1.jpg')
     }
   ];
 
@@ -671,37 +644,31 @@ const HomeScreen: React.FC = () => {
         </ImageBackground>
 
       <View style={styles.section}>
-    <Text style={styles.sectionTitle}>Peliharaan Anda</Text>
-    {pets.length > 0 ? (
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.petsContainer}
-      >
-        {pets.map((pet) => (
+      <Text style={styles.sectionTitle}>Peliharaan Anda</Text>
+      {pets.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.petListContainer}
+        >
+          {pets.map((pet) => (
+            <View key={pet.id} style={styles.petCard}>
+              <MaterialIcons name="pets" size={32} color="#2196F3" />
+              <Text style={styles.petName}>{pet.name}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      ) : (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="pets" size={48} color="#ccc" />
+          <Text style={styles.emptyText}>Belum ada peliharaan</Text>
           <TouchableOpacity 
-            key={pet.id} 
-            style={styles.petCard}
-            onPress={() => handlePetPress(pet)}
+            style={styles.addPetButton}
+            onPress={() => console.log('Add pet pressed')}
             activeOpacity={0.8}
           >
-            <Image source={pet.image} style={styles.petImage} />
-            <Text style={styles.petName} numberOfLines={1}>{pet.name}</Text>
-            <Text style={styles.petType} numberOfLines={1}>{pet.type}</Text>
+            <Text style={styles.addPetButtonText}>Tambah Peliharaan</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
-    ) : (
-      <View style={styles.emptyContainer}>
-        <MaterialIcons name="pets" size={48} color="#ccc" />
-        <Text style={styles.emptyText}>Belum ada peliharaan</Text>
-        <TouchableOpacity 
-          style={styles.addPetButton}
-          onPress={() => console.log('Add pet pressed')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.addPetButtonText}>Tambah Peliharaan</Text>
-        </TouchableOpacity>
       </View>
     )}
   </View>
@@ -733,7 +700,9 @@ const HomeScreen: React.FC = () => {
             activeOpacity={0.8}
           >
             <View style={styles.reservationTopRow}>
-              <Image source={reservation.image} style={styles.reservationImage} />
+              <View style={styles.reservationIconContainer}>
+                <MaterialIcons name="pets" size={36} color="#2196F3" />
+              </View>
               <View style={styles.reservationInfo}>
                 <Text style={styles.reservationName} numberOfLines={1}>{reservation.petName}</Text>
                 <Text style={styles.reservationGender}>{reservation.gender}</Text>
@@ -767,8 +736,8 @@ const HomeScreen: React.FC = () => {
           <Text style={styles.sectionTitle}>Dokter Tersedia</Text>
           <View style={styles.doctorsContainer}>
             <View style={styles.doctorCard}>
-              <MaterialIcons name="medical-services" size={24} color="#4CAF50" />
-              <Text style={styles.doctorName}>Dr. Smith</Text>
+              <MaterialIcons name="medical-services" size={24} color="#008CFC" />
+              <Text style={styles.doctorName}>Dr. Teguh Prasetya</Text>
               <Text style={styles.doctorSpecialty}>Dokter Hewan</Text>
             </View>
           </View>
@@ -782,6 +751,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    marginTop: 32,
   },
   loadingContainer: {
     justifyContent: 'center',
@@ -797,7 +767,6 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    paddingTop: 40,
   },
   headerContent: {
     flexDirection: 'row',
@@ -901,17 +870,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  petCard: {
-    alignItems: 'center',
-    width: 80,
+  petListContainer: {
+    flexDirection: 'row',
+    gap: 16,
+    paddingVertical: 8,
   },
-  petImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+  petCard: {
+    width: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    backgroundColor: '#E6F3FE',
+    borderRadius: 12,
+  },
+  petIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#008CFC',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 8,
   },
   petName: {
+    marginTop: 8,
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
@@ -973,10 +955,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  reservationImage: {
+  reservationIconContainer: {
     width: 50,
     height: 50,
     borderRadius: 25,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   reservationInfo: {
@@ -1024,7 +1009,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   doctorCard: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#E6F3FE',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',

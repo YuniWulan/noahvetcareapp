@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Platform,
+  KeyboardAvoidingView,
+  SafeAreaView
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NoahLogo from "../../assets/noah-logo.png";
@@ -29,6 +32,17 @@ export const LoginScreen = ({ navigation }: Props) => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  
+    const handleInputFocus = useCallback((yOffset: number) => {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({
+          y: yOffset,
+          animated: true,
+        });
+      }, 100);
+    }, []);
 
   const handleLogin = async () => {
     if (!name || !password) {
@@ -100,85 +114,109 @@ export const LoginScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.logoContainer}>
-        <Image source={NoahLogo} style={styles.logo} />
-      </View>
-
-      <Text style={styles.welcomeTitle}>Halo,</Text>
-      <Text style={styles.welcomeTitle}>Selamat Datang!</Text>
-      <Text style={styles.welcomeSubTitle}>
-        Pastikan hewan peliharaan selalu sehat - atur janji dan pantau riwayat
-        perawatannya!
-      </Text>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>
-          Nama Pengguna<Text style={styles.required}>*</Text>
-        </Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Masukkan Nama Pengguna"
-          value={name}
-          onChangeText={setName}
-          autoCapitalize="none"
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>
-          Kata Sandi<Text style={styles.required}>*</Text>
-        </Text>
-        <View style={styles.passwordWrapper}>
-          <TextInput
-            style={styles.passwordInputFull}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Masukkan Kata Sandi"
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry={!showPassword}
-          />
-          <TouchableOpacity
-            style={styles.iconContainer}
-            onPress={() => setShowPassword(!showPassword)}
+    <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            contentContainerStyle={styles.container}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <Ionicons
-              name={showPassword ? "eye" : "eye-off"}
-              size={24}
-              color="#888"
+        <View style={styles.logoContainer}>
+          <Image source={NoahLogo} style={styles.logo} />
+        </View>
+
+        <Text style={styles.welcomeTitle}>Halo, Selamat Datang!</Text>
+        <Text style={styles.welcomeSubTitle}>
+          Pastikan hewan peliharaan selalu sehat - atur janji dan pantau riwayat
+          perawatannya!
+        </Text>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>
+            Nama Pengguna<Text style={styles.required}>*</Text>
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Masukkan Nama Pengguna"
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="none"
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>
+            Kata Sandi<Text style={styles.required}>*</Text>
+          </Text>
+          <View style={styles.passwordWrapper}>
+            <TextInput
+              style={styles.passwordInputFull}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Masukkan Kata Sandi"
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry={!showPassword}
             />
+            <TouchableOpacity
+              style={styles.iconContainer}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons
+                name={showPassword ? "eye" : "eye-off"}
+                size={24}
+                color="#888"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.forgotPasswordContainer}>
+          <TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}>
+            <Text style={styles.forgotPasswordText}>Lupa kata sandi?</Text>
           </TouchableOpacity>
         </View>
-      </View>
 
-      <View style={styles.forgotPasswordContainer}>
-        <TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}>
-          <Text style={styles.forgotPasswordText}>Lupa kata sandi?</Text>
+        <TouchableOpacity
+          style={[styles.button, loading && { opacity: 0.6 }]}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Loading..." : "Masuk"}
+          </Text>
         </TouchableOpacity>
-      </View>
 
-      <TouchableOpacity
-        style={[styles.button, loading && { opacity: 0.6 }]}
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? "Loading..." : "Masuk"}
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => navigation.navigate("Register")}>
-        <Text style={styles.registerText}>
-          Belum punya akun?{" "}
-          <Text style={styles.registerLink}>Daftar</Text>
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+          <Text style={styles.registerText}>
+            Belum punya akun?{" "}
+            <Text style={styles.registerLink}>Daftar</Text>
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  scrollView: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
   container: {
     padding: 20,
     paddingTop: 60,

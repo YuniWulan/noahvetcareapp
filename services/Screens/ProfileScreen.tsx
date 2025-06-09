@@ -1,8 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { 
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, 
-  Alert, ActivityIndicator 
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -21,7 +18,6 @@ type PetType = {
   pet_name: string;
   species: string;
   age: number;
-  image?: any;
 };
 
 type UserData = {
@@ -158,10 +154,9 @@ const ProfileScreen = () => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.profileHeader}>
-          <Image 
-            source={require('../../assets/user-image.jpg')} 
-            style={styles.petImage}
-          />
+          <View style={styles.UserIcon}>
+            <MaterialIcons name="account-circle" size={120} color="#2196F3" />
+          </View>
          
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>
@@ -180,26 +175,39 @@ const ProfileScreen = () => {
 
         <View style={styles.divider} />
 
-        <Text style={styles.sectionTitle}>Peliharaan Anda</Text>
-        
-        <View style={styles.petsRow}>
-          {pets.map((pet, index) => (
-            <View key={index} style={styles.petContainer}>
-              <Image 
-                source={
-                  pet.image 
-                    ? pet.image 
-                    : require('../../assets/asset-hidog.png') // default
-                } 
-                style={styles.petImage} 
-              />
-              <Text style={styles.petText}>{pet.pet_name}</Text>
-            </View>
-          ))}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Peliharaan Anda</Text>
           <TouchableOpacity style={styles.addButton} onPress={handleAddPet}>
             <MaterialIcons name="add" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
+
+        {pets.length > 0 ? (
+          <View style={styles.petListContainer}>
+            {pets.map((pet) => (
+              <TouchableOpacity 
+                key={pet.id} 
+                style={styles.petCard}
+                onPress={() => navigation.navigate('DetailPetScreen')}
+              >
+                <MaterialIcons name="pets" size={24} color="#2196F3" style={styles.petIcon} />
+                <Text style={styles.petName}>{pet.pet_name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyContainer}>
+            <MaterialIcons name="pets" size={48} color="#ccc" />
+            <Text style={styles.emptyText}>Belum ada peliharaan</Text>
+            <TouchableOpacity 
+              style={styles.addPetButton}
+              onPress={handleAddPet}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.addPetButtonText}>Tambah Peliharaan</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
@@ -225,6 +233,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    marginTop: 32,
   },
   scrollContainer: {
     paddingBottom: 80,
@@ -235,23 +244,21 @@ const styles = StyleSheet.create({
     padding: 20,
     position: 'relative',
   },
-  profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 16,
+  UserIcon: {
+    marginRight: 18,
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: 18,
+    fontWeight: 'normal',
     color: '#666',
   },
   editButton: {
@@ -278,41 +285,75 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginVertical: 16,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginHorizontal: 20,
     marginBottom: 16,
   },
-  petsRow: {
+  petListContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  petCard: {
+    width: '48%',
+    backgroundColor: '#E6F3FE',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#8FA3CB',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 5,
+    shadowRadius: 2,
+  },
+  petIcon: {
+    marginRight: 8,
+  },
+  petName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
     marginHorizontal: 20,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
     marginBottom: 16,
   },
-  petContainer: {
-    alignItems: 'center',
-    marginRight: 12,
-    marginBottom: 12,
-    width: 80,
+  addPetButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
   },
-  petImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginBottom: 8,
-  },
-  petText: {
-    fontSize: 12,
-    color: '#333',
-    textAlign: 'center',
+  addPetButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   addButton: {
     backgroundColor: '#2196F3',
     borderRadius: 30,
-    width: 60,
-    height: 60,
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
   }, 

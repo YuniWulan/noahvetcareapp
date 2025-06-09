@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Image, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, RefreshControl, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'; 
@@ -17,7 +17,6 @@ interface ReservationItem {
   time: string;
   status: ReservationStatus;
   notes?: string;
-  image: any;
 }
 
 type RootStackParamList = {
@@ -204,26 +203,6 @@ const mapStatus = (backendStatus: string): ReservationStatus => {
   return statusMap[backendStatus] || 'Menunggu';
 };
 
-const getImageForPet = (petName: string): any => {
-  const images = [
-    require('../../assets/dog1.jpg'),
-    require('../../assets/dog2.jpg'),
-    require('../../assets/dog3.jpg'),
-    require('../../assets/dog4.jpg'),
-    require('../../assets/cat1.jpg'),
-  ];
-  
-  if (!petName) return images[0];
-  
-  // Simple hash for consistent image based on pet name
-  const hash = petName.split('').reduce((a, b) => {
-    a = ((a << 5) - a) + b.charCodeAt(0);
-    return a & a;
-  }, 0);
-  
-  return images[Math.abs(hash) % images.length];
-};
-
 // Transform backend data to frontend format
 const transformAppointmentData = (appointmentData: any): ReservationItem => {
   return {
@@ -234,7 +213,6 @@ const transformAppointmentData = (appointmentData: any): ReservationItem => {
     time: formatTime(appointmentData.date),
     status: mapStatus(appointmentData.status),
     notes: appointmentData.notes || '',
-    image: getImageForPet(appointmentData.pet_name),
   };
 };
 
@@ -376,7 +354,7 @@ const ReservationListScreen = () => {
   const getStatusColor = (status: ReservationStatus): string => {
     switch (status) {
       case 'Selesai': return '#4CAF50';
-      case 'Terjadwal': return '#2196F3';
+      case 'Terjadwal': return '#009C41';
       case 'Menunggu': return '#FFC107';
       case 'Ditolak': return '#F44336';
       default: return '#9E9E9E';
@@ -494,7 +472,9 @@ const ReservationListScreen = () => {
                 activeOpacity={0.7}
               >
                 <View style={styles.reservationTopRow}>
-                  <Image source={item.image} style={styles.reservationImage} />
+                  <View style={styles.reservationIconContainer}>
+                    <MaterialIcons name="pets" size={36} color="#2196F3" />
+                  </View>
                   <View style={styles.reservationTextContainer}>
                     <Text style={styles.reservationName}>{item.petName}</Text>
                     <Text style={styles.doctorName}>Dr. {item.doctorName}</Text>
@@ -532,23 +512,27 @@ const ReservationListScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fff'
   },
   container: {
     flex: 1,
+    marginTop: 32,
   },
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   titleContainer: {
+    // paddingVertical: 20,
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 16,
     paddingBottom: 16,
   },
   titleText: {
     fontSize: 24,
     fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center'
   },
   tabContainer: {
     flexDirection: 'row',
@@ -566,6 +550,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 16,
+    fontWeight: '500',
     color: '#9E9E9E',
   },
   activeTabText: {
@@ -636,11 +621,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  reservationImage: {
+  reservationIconContainer: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    marginRight: 12,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 24,
   },
   reservationTextContainer: {
     flex: 1,

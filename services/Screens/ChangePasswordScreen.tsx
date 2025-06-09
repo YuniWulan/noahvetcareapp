@@ -118,9 +118,10 @@ const ChangePasswordScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
   },
   header: {
+    marginTop: 32,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
