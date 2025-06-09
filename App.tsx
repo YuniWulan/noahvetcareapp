@@ -24,6 +24,8 @@ import ProfileScreen from './services/Screens/ProfileScreen';
 import EditProfileScreen from './services/Screens/EditProfilScreen';
 import ChangePasswordScreen from './services/Screens/ChangePasswordScreen';
 import AddPetScreen from './services/Screens/AddPetScreen';
+import DetailPetScreen from './services/Screens/DetailPetScreen';
+import DetailReservation from './services/Screens/DetailReservation';
 
 // Define Tab Params
 export type MainTabParamList = {
@@ -102,6 +104,8 @@ export type RootStackParamList = {
   DoctorHome: undefined;
   MainTabs: undefined;
   Reservasi: undefined;
+  DetailPetScreen: undefined;
+  DetailReservation: undefined;
   ReservationList?: {
   newReservation?: {
     id: string;
@@ -141,14 +145,16 @@ export default function App() {
         <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
 
         {/* Other Screens */}
-        <Stack.Screen name="Reservasi" component={ReservasiScreen} options={{ title: '' }} />
+        <Stack.Screen name="Reservasi" component={ReservasiScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ReservationList" component={ReservationListScreen} options={{ title: '' }} />
         <Stack.Screen name="Transaction" component={TransactionScreen} options={{ title: '' }} />
         <Stack.Screen name="ReservationSuccess" component={ReservationSuccessScreen} options={{ title: '' }} />
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: '' }} />
-        <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: '' }} />
-        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: '' }} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AddPetScreen" component={AddPetScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="DetailPetScreen" component={DetailPetScreen} options={{headerShown: false}}/>
+        <Stack.Screen name="DetailReservation" component={DetailReservation} options={{headerShown: false}}/>
       </Stack.Navigator>
     </NavigationContainer>
   );
