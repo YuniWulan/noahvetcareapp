@@ -12,15 +12,13 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   SafeAreaView,
-  Platform,
+  Platform, 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
-
-type ReservasiNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 // Pet interface for better type safety - Updated to match API response
 interface Pet {
@@ -36,8 +34,25 @@ interface Pet {
   name?: string; // Keep for backward compatibility
 }
 
+interface Doctor {
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  is_doctor: boolean;
+  speciality: string;
+  phone?: string | null;
+}
+
+type ReservasiNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 export default function Reservasi() {
+  // Navigation hook with error handling
   const navigation = useNavigation<ReservasiNavigationProp>();
+  
+  // Check if navigation is available
+  const isNavigationReady = navigation && typeof navigation.navigate === 'function';
+  
   const [token, setToken] = useState<string | null>(null);
   const [userID, setUserID] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -47,6 +62,11 @@ export default function Reservasi() {
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
   const [isPetsLoading, setIsPetsLoading] = useState(false);
   const [petsError, setPetsError] = useState<string | null>(null);
+
+  //Doctor states
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [isDoctorsLoading, setIsDoctorsLoading] = useState(false);
+  const [doctorsError, setDoctorsError] = useState<string | null>(null);
   
   // Other states
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -55,6 +75,51 @@ export default function Reservasi() {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<number | null>(8);
+
+  const API_BASE_URL = 'https://noahvetcare.naufalalfa.com';
+
+  const getAuthToken = async (): Promise<string | null> => {
+    try {
+      return await AsyncStorage.getItem('token');
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  };
+
+  // Safe navigation function
+  const safeNavigate = (screenName: string, params?: any) => {
+    if (!isNavigationReady) {
+      console.error('Navigation not ready');
+      Alert.alert('Error', 'Navigation belum siap. Silakan coba lagi.');
+      return false;
+    }
+    
+    try {
+      navigation.navigate(screenName as any, params);
+      return true;
+    } catch (error) {
+      console.error('Navigation error:', error);
+      Alert.alert('Error', 'Gagal melakukan navigasi.');
+      return false;
+    }
+  };
+
+  // Safe go back function
+  const safeGoBack = () => {
+    if (!isNavigationReady) {
+      console.error('Navigation not ready for goBack');
+      return false;
+    }
+    
+    try {
+      navigation.goBack();
+      return true;
+    } catch (error) {
+      console.error('GoBack error:', error);
+      return false;
+    }
+  };
 
   // Function to fetch pets from API - Fixed to match API documentation
   const fetchUserPets = async (token: string, userID: string) => {
@@ -66,7 +131,7 @@ export default function Reservasi() {
       console.log('Using token:', token ? 'Token available' : 'No token');
 
       // Fixed URL to match documentation
-      const response = await fetch(`https://noahvetcare.naufalalfa.com/v1/api/pet/lists/${userID}`, {
+      const response = await fetch(`${API_BASE_URL}/v1/api/pet/lists/${userID}`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -89,11 +154,9 @@ export default function Reservasi() {
             pet_name: pet.pet_name,
             species: pet.species,
             age: pet.age,
-            // Add backward compatibility fields
-            name: pet.pet_name, // For UI compatibility
-            breed: pet.species, // Use species as breed for now
-            type: pet.species,
-            // Keep existing fields that might be used in UI
+            name: pet.pet_name, 
+            breed: pet.species, 
+            type: pet.species, 
             gender: pet.gender,
             owner_id: pet.owner_id,
             image: pet.image,
@@ -128,6 +191,88 @@ export default function Reservasi() {
     }
   };
 
+  const getMockDoctorsData = (): Doctor[] => [
+    {
+      id: 8,
+      name: 'Dr. Smith',
+      email: 'dr.smith@example.com',
+      username: 'dr_smith',
+      is_doctor: true,
+      speciality: 'Dokter Hewan Umum',
+      phone: null,
+    },
+  ];
+
+  // Fetch doctors from API
+  const fetchDoctorsData = async (): Promise<Doctor[]> => {
+    console.log('👨‍⚕️ Starting fetchDoctorsData...');
+    setIsDoctorsLoading(true);
+    setDoctorsError(null);
+
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        console.warn('No token available, using mock data');
+        return getMockDoctorsData();
+      }
+
+      // Doctor IDs to fetch - you can modify this list as needed
+      const doctorIds = [7, 8]; // Add more doctor IDs as needed
+
+      const fetchDoctorById = async (id: number): Promise<Doctor | null> => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/v1/api/user/details/${id}`, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!response.ok) {
+            if (response.status === 404) {
+              console.warn(`⚠️ Doctor with ID ${id} not found (404)`);
+            } else {
+              console.warn(`⚠️ Failed to fetch doctor with ID ${id}, status: ${response.status}`);
+            }
+            return null;
+          }
+
+          const doctor = await response.json();
+          if (!doctor.is_doctor) {
+            console.warn(`⚠️ User ID ${id} is not a doctor`);
+            return null;
+          }
+
+          return {
+            id: doctor.id,
+            name: doctor.name || doctor.username || `Doctor ${id}`,
+            email: doctor.email || '',
+            username: doctor.username || `doctor${id}`,
+            is_doctor: true,
+            speciality: doctor.speciality || 'Dokter Hewan Umum',
+            phone: doctor.phone || null,
+          };
+        } catch (err) {
+          console.error(`❌ Error fetching doctor ID ${id}:`, err);
+          return null;
+        }
+      };
+
+      const doctorPromises = doctorIds.map(fetchDoctorById);
+      const doctorResults = await Promise.all(doctorPromises);
+      const validDoctors = doctorResults.filter((d): d is Doctor => d !== null);
+      
+      return validDoctors.length > 0 ? validDoctors : getMockDoctorsData();
+
+    } catch (error) {
+      console.error('Error fetching doctors data:', error);
+      setDoctorsError('Gagal memuat data dokter');
+      return getMockDoctorsData();
+    } finally {
+      setIsDoctorsLoading(false);
+    }
+  };
+
   // Load auth data and fetch pets
   useEffect(() => {
     const loadAuthData = async () => {
@@ -147,11 +292,17 @@ export default function Reservasi() {
 
         // Fetch API pets after token and userID are available
         if (storedToken && storedUserID) {
-          await fetchUserPets(storedToken, storedUserID);
+          await Promise.all ([
+            fetchUserPets(storedToken, storedUserID),
+            fetchDoctorsData().then(setDoctors)
+        ]);
         } else {
           console.warn('Token or UserID not available');
           if (!storedToken) setPetsError('Token tidak tersedia');
           if (!storedUserID) setPetsError('User ID tidak tersedia');
+
+          // Still try to fetch doctors even without pets
+          fetchDoctorsData().then(setDoctors);
         }
 
       } catch (error: any) {
@@ -171,10 +322,10 @@ export default function Reservasi() {
     }
   };
  
-  const doctors = [
-    { id: 8, name: 'Dr. Smith', specialty: 'General' },
-    { id: 9, name: 'Dr. Johnson', specialty: 'Surgery' },
-  ];
+  const refreshDoctors = async () => {
+    const doctorsData = await fetchDoctorsData();
+    setDoctors(doctorsData);
+  };
 
   const times = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
 
@@ -234,7 +385,7 @@ export default function Reservasi() {
       const doctor = doctors.find((d) => d.id === selectedDoctor);
       if (!doctor) throw new Error('Dokter tidak ditemukan');
 
-      const response = await fetch(`https://noahvetcare.naufalalfa.com/v1/api/appointment/create`, {
+      const response = await fetch(`${API_BASE_URL}/v1/api/appointment/create`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -258,40 +409,167 @@ export default function Reservasi() {
         throw new Error(`Response bukan JSON: ${text}`);
       }
 
-      const data = await response.json();
-      console.log('Response data:', data);
+      const responseData = await response.json();
+      console.log('Response data:', responseData);
 
       if (!response.ok) {
-        throw new Error(data.message || data.error || 'Gagal membuat appointment');
+        throw new Error(responseData.message || responseData.error || 'Gagal membuat appointment');
       }
 
-      Alert.alert('Sukses', 'Appointment berhasil dibuat', [
-        {
-          text: 'OK',
-          onPress: () => {
-            (navigation as any).navigate('MainTabs', { 
-              screen: 'ReservationList',
-              params: { shouldRefresh: true }
-            });
+      console.log('✅ Appointment created successfully:', responseData);
+
+      // Extract appointment ID from response with comprehensive fallback
+      const extractAppointmentId = (responseData: any): string | null => {
+        console.log('=== EXTRACTING APPOINTMENT ID ===');
+        console.log('Full API Response:', JSON.stringify(responseData, null, 2));
+        
+        // Check all possible ID fields
+        const possibleIds = [
+          responseData.appointment_id,
+          responseData.id,
+          responseData.appointmentId,
+          responseData._id,
+          responseData.data?.id,
+          responseData.data?.appointment_id,
+          responseData.appointment?.id,
+          responseData.appointment?.appointment_id,
+          responseData.appointmentData?.[0]?.id,
+          responseData.appointmentData?.[0]?.appointment_id,
+          responseData.success?.id,
+          responseData.success?.appointment_id,
+          responseData.result?.id,
+          responseData.result?.appointment_id,
+        ];
+        
+        console.log('Possible ID values:', possibleIds);
+        
+        // Find the first valid ID
+        for (const id of possibleIds) {
+          if (id !== undefined && id !== null && id !== '') {
+            const appointmentId = typeof id === 'number' ? id.toString() : String(id);
+            if (appointmentId !== 'undefined' && appointmentId !== 'null') {
+              console.log('✅ Found valid appointment ID:', appointmentId);
+              return appointmentId;
+            }
           }
         }
-      ]);
-
-      const newReservation = {
-        id: data.appointment_id.toString(),
-        petName: selectedPet?.pet_name || 'Unknown Pet',
-        gender: selectedPet.gender || 'Unknown',
-        date: dateTime.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
-        time: selectedTime,
-        status: 'Menunggu' as const,
-        image: selectedPet.image,
+        
+        console.log('❌ No valid appointment ID found');
+        return null;
       };
 
-      // Reset form
-      setSelectedPet(null);
-      setSelectedDate(null);
-      setSelectedTime(null);
-      setNotes(''); 
+      // Navigate to appointment details with error handling
+      const navigateToAppointmentDetails = (appointmentId: string, responseData: any, appointmentFormData: any) => {
+        console.log('🚀 Preparing navigation to DetailReservation');
+        console.log('🚀 Appointment ID:', appointmentId);
+        console.log('🚀 Response Data:', responseData);
+        console.log('🚀 Form Data:', appointmentFormData);
+        
+        try {
+          // Validate appointmentId
+          const validAppointmentId = appointmentId?.toString();
+          if (!validAppointmentId || validAppointmentId === 'undefined' || validAppointmentId === 'null') {
+            throw new Error('Invalid appointment ID for navigation');
+          }
+
+          // Prepare comprehensive appointment data
+          const appointmentData = {
+            id: validAppointmentId,
+            pet_id: appointmentFormData.pet_id,
+            petName: appointmentFormData.petName,
+            doctor_id: appointmentFormData.doctor_id,
+            doctorName: appointmentFormData.doctorName,
+            date: appointmentFormData.date,
+            time: appointmentFormData.time,
+            status: 'Scheduled',
+            notes: appointmentFormData.notes,
+            // Include any additional data from API response
+            ...responseData.appointment,
+            ...responseData.data
+          };
+
+          const navigationParams = {
+            appointmentId: validAppointmentId,
+            petName: appointmentFormData.petName,
+            appointmentData: appointmentData,
+            fromReservasi: true
+          };
+
+          console.log('🚀 Final navigation params:', navigationParams);
+
+          // Use setTimeout to ensure navigation state is ready
+          setTimeout(() => {
+            if (!safeNavigate('DetailReservation', navigationParams)) {
+              Alert.alert('Navigation Error', 'Appointment berhasil dibuat tapi tidak dapat membuka detail.');
+            } else {
+              console.log('✅ Navigation completed successfully');
+            }
+          }, 200);
+          
+        } catch (error) {
+          console.error('❌ Navigation preparation failed:', error);
+          Alert.alert('Error', 'Gagal mempersiapkan navigasi ke detail appointment.');
+        }
+      };
+
+      // Clear form function
+      const clearForm = () => {
+        setSelectedPet(null);
+        setSelectedDate(null);
+        setSelectedTime(null);
+        setNotes(''); 
+        setSelectedDoctor(null);
+      };
+
+      // Prepare form data for navigation
+      const appointmentFormData = {
+        pet_id: selectedPet.id,
+        petName: selectedPet.pet_name || selectedPet.name || 'Unknown Pet',
+        doctor_id: selectedDoctor,
+        doctorName: doctor.name,
+        date: dateTime.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+        time: selectedTime,
+        notes: notes
+      };
+
+      // Extract appointment ID from response
+      const appointmentId = extractAppointmentId(responseData);
+      console.log('Extracted appointment ID:', appointmentId);
+
+      // Show success alert with appropriate options (similar to add pet)
+      Alert.alert(
+        "Success", 
+        "Appointment berhasil dibuat!",
+        [
+          {
+            text: "View Details",
+            onPress: () => {
+              if (appointmentId) {
+                // Add delay to ensure navigation state is ready
+                setTimeout(() => {
+                  navigateToAppointmentDetails(appointmentId, responseData, appointmentFormData);
+                }, 100);
+              } else {
+                console.warn('Appointment ID not found, cannot navigate to details');
+                Alert.alert(
+                  'Navigation Error', 
+                  'Appointment berhasil dibuat tapi tidak dapat menavigasi ke detail. Silakan cek di daftar reservasi.',
+                  [{ text: 'OK', onPress: () => safeGoBack() }]
+                );
+              }
+            }
+          },
+          {
+            text: "Add Another",
+            onPress: clearForm
+          },
+          {
+            text: "Go Back",
+            onPress: () => safeGoBack()
+          }
+        ]
+      );
+
     } catch (error: any) { 
       console.error('Create appointment error:', error);
       Alert.alert('Error', error.message);
@@ -304,17 +582,12 @@ export default function Reservasi() {
     createAppointment();
   };
 
-  // Get pet display name - helper function
+  // Get pet display name - helper function (simplified to show only name)
   const getPetDisplayName = (pet: Pet) => {
     return pet.pet_name || pet.name || 'Unknown Pet';
   };
 
-  // Get pet display breed - helper function  
-  const getPetDisplayBreed = (pet: Pet) => {
-    return pet.breed || pet.species || 'Unknown Breed';
-  };
-
-  // Render pet section
+  // Render pet section (simplified to show only name)
   const renderPetSection = () => {
     if (isPetsLoading) {
       return (
@@ -359,28 +632,61 @@ export default function Reservasi() {
           >
             <Text style={selectedPet?.id === pet.id ? styles.selectedPetText : styles.petText}>
               {getPetDisplayName(pet)}
-            </Text>
-            <Text style={styles.petBreed}>{getPetDisplayBreed(pet)}</Text>
-            <View style={styles.petInfoContainer}>
-              <Text style={styles.petInfo}>
-                {pet.age ? `${pet.age} tahun` : ''} {pet.gender ? `• ${pet.gender}` : ''}
-              </Text>
-            </View>
+            </Text> 
           </TouchableOpacity>
         ))}
       </ScrollView>
     );
   };
 
-  return (
-  <SafeAreaView style={styles.safeArea}>
-    <KeyboardAvoidingView 
-      style={styles.keyboardAvoidingView}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
+  // Render doctor section
+  const renderDoctorSection = () => {
+    if (isDoctorsLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007bff" />
+          <Text style={styles.loadingText}>Memuat dokter...</Text>
+        </View>
+      );
+    }
+
+    if (doctorsError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{doctorsError}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={refreshDoctors}>
+            <Text style={styles.retryButtonText}>Coba Lagi</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.doctorList}>
+        {doctors.map((doctor) => (
+          <TouchableOpacity
+            key={doctor.id}
+            style={[styles.doctorItem, selectedDoctor === doctor.id && styles.selectedDoctorItem]}
+            onPress={() => setSelectedDoctor(doctor.id)}
+          >
+            <Text style={selectedDoctor === doctor.id ? styles.selectedDoctorText : styles.doctorText}>
+              {doctor.name}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  return ( 
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => safeGoBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Buat Reservasi</Text>
@@ -394,19 +700,7 @@ export default function Reservasi() {
         {renderPetSection()}
 
         <Text style={styles.sectionTitle}>Pilih Dokter</Text>
-        <View style={styles.doctorList}>
-          {doctors.map((doctor) => (
-            <TouchableOpacity
-              key={doctor.id}
-              style={[styles.doctorItem, selectedDoctor === doctor.id && styles.selectedDoctorItem]}
-              onPress={() => setSelectedDoctor(doctor.id)}
-            >
-              <Text style={selectedDoctor === doctor.id ? styles.selectedDoctorText : styles.doctorText}>
-                {doctor.name} ({doctor.specialty})
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {renderDoctorSection()}
 
         <Text style={styles.sectionTitle}>Pilih Tanggal</Text>
         <View style={styles.monthPicker}>
@@ -488,13 +782,12 @@ export default function Reservasi() {
     </View>
     </KeyboardAvoidingView>
     </SafeAreaView>
-  );
-}
-
+  ); 
+} 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -502,13 +795,13 @@ const styles = StyleSheet.create({
   },
   container: { 
     flex: 1, 
-    backgroundColor: '#fff',
-    marginTop: 48,
+    backgroundColor: '#fff' 
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
+    paddingTop: 40,
     paddingBottom: 10,
     backgroundColor: '#fff',
     justifyContent: 'space-between',
@@ -726,12 +1019,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   timeItem: {
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#ccc',
-    marginRight: 14,
+    marginRight: 10,
     marginBottom: 10,
   },
   selectedTimeItem: {

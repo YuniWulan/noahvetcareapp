@@ -23,7 +23,7 @@ type RootStackParamList = {
   ReservationList: {
     shouldRefresh?: boolean;
   };
-  ReservationDetail: {
+  DetailReservation: {
     reservationId: string;
     reservationData: ReservationItem;
   };
@@ -147,23 +147,31 @@ const appointmentAPI = {
 
 // Helper functions
 const formatDate = (dateString: string): string => {
-  if (!dateString) return 'Date not set';
+  if (!dateString) return 'Tanggal tidak ditentukan';
   
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
-      return 'Invalid date';
+      return 'Tanggal tidak valid';
     }
     
-    const options: Intl.DateTimeFormatOptions = { 
-      weekday: 'long', 
-      month: 'short', 
-      day: 'numeric' 
-    };
-    return date.toLocaleDateString('en-US', options);
+    const dayNames = [
+      'Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'
+    ];
+
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    
+    const dayName = dayNames[date.getDay()];
+    const monthName = monthNames[date.getMonth()];
+    const dayNumber = date.getDate();
+
+    return `${dayName}, ${dayNumber} ${monthName}`;
   } catch (error) {
     console.error('Error formatting date:', error);
-    return 'Invalid date';
+    return 'Tanggal tidak valid';
   }
 };
 
@@ -330,19 +338,18 @@ const ReservationListScreen = () => {
     }
   }, [userId, loadReservations]);
 
-  // Handle focus effect and navigation params
+  // Handle focus effect and navigation params - matching ProfileScreen pattern
   useFocusEffect(
     useCallback(() => {
-      // Always refresh data when screen comes into focus
-      // This ensures we get the latest data from the server
-      if (userId && route.params?.shouldRefresh) {
-        console.log('Refreshing due to shouldRefresh param');
-        loadReservations(false);
-        
-        // Clear the param to prevent infinite refresh
-        navigation.setParams({ shouldRefresh: undefined });
-      }
-    }, [route.params?.shouldRefresh, loadReservations, navigation, userId])
+      const refresh = async () => {
+        if (userId) {
+          setIsLoading(true);
+          await loadReservations(false);
+          setIsLoading(false);
+        }
+      };
+      refresh();
+    }, [userId, loadReservations])
   );
 
   const filteredReservations = allReservations.filter(reservation => 
@@ -365,24 +372,13 @@ const ReservationListScreen = () => {
     navigation.navigate('Reservasi'); 
   };
 
-  const handleReservationPress = async (reservation: ReservationItem) => {
-    try {
-      // Show loading feedback
-      // You might want to add a loading state here
-      
-      // Fetch detailed appointment data
-      const details = await appointmentAPI.getAppointmentDetails(reservation.id);
-      
-      // Navigate to detail screen with complete data
-      navigation.navigate('ReservationDetail', { 
-        reservationId: reservation.id,
-        reservationData: { ...reservation, ...details }
-      });
-    } catch (error) {
-      console.error('Error fetching reservation detail:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load reservation details';
-      Alert.alert('Error', errorMessage);
-    }
+  // Updated to match ProfileScreen pattern - simple navigation with logging
+  const handleReservationPress = (reservation: ReservationItem) => {
+    console.log('Navigasi ke DetailReservation dengan reservationId:', reservation.id);
+    navigation.navigate('DetailReservation', { 
+      reservationId: reservation.id,
+      reservationData: reservation
+    });
   };
 
   // Show loading if no userId yet
@@ -522,8 +518,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  titleContainer: {
-    // paddingVertical: 20,
+  titleContainer: { 
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 16,
@@ -684,4 +679,4 @@ const styles = StyleSheet.create({
   }, 
 });
 
-export default ReservationListScreen; 
+export default ReservationListScreen;
