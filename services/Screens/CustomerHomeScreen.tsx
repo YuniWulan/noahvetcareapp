@@ -15,11 +15,13 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NavigationProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../../App';
 
-type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
+type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+ 
 interface Pet {
   id: string;
   name: string;
@@ -38,13 +40,27 @@ interface User {
   phone: string | null;
 }
 
+interface Doctor {
+  id: number;
+  name: string;
+  email: string;
+  username: string;
+  is_doctor: boolean;
+  speciality: string | null;
+  phone: string | null;
+}
+
 interface Reservation {
+  originalDate: string;
   id: string;
-  petName: string;
-  gender: string;
+  petName: string; 
   date: string;
   time: string;
   status: string;
+  gender: string;
+  doctorName?: string;  
+  doctor_name?: string; 
+  notes?: string;       
 }
 
 interface ApiResponse<T> {
@@ -65,6 +81,7 @@ const HomeScreen: React.FC = () => {
   const [pets, setPets] = useState<Pet[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,6 +137,29 @@ const HomeScreen: React.FC = () => {
     } catch (error) {
       console.error('Error getting user ID:', error);
       return null;
+    }
+  };
+
+   const fetchFromAPI = async (endpoint: string, token: string) => {
+    const response = await fetchWithTimeout(`${API_BASE_URL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+
+    const responseText = await response.text();
+    console.log(`📄 Raw response for ${endpoint}:`, responseText);
+
+    try {
+      return JSON.parse(responseText);
+    } catch (parseError) {
+      throw new Error('Invalid JSON response');
     }
   };
 
@@ -253,6 +293,72 @@ const HomeScreen: React.FC = () => {
   }
 };
 
+// Enhanced doctor data fetching
+ const fetchDoctorsData = async (): Promise<Doctor[]> => {
+  console.log('👨‍⚕️ Starting fetchDoctorsData...');
+
+ try {
+    const token = await getAuthToken();
+    if (!token) return getMockDoctorsData();
+
+    // Ambil daftar doctorId dari janji terlebih dahulu (misal dari fetchReservationsData)
+    const appointmentDoctorsIds = [8]; // Contoh ambil dari hasil janji
+    
+    // Gabungkan dengan doctorIds tetap kalau perlu
+    const doctorId = Array.from(new Set([...appointmentDoctorsIds, 1]));
+
+    const doctorIds = [7, 8,]; // contoh beberapa dokter
+
+    const fetchDoctorById = async (id: number): Promise<Doctor | null> => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/v1/api/user/details/${id}`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            console.warn(`⚠️ Doctor with ID ${id} not found (404)`);
+          } else {
+            console.warn(`⚠️ Failed to fetch doctor with ID ${id}, status: ${response.status}`);
+          }
+          return null;
+        }
+
+        const doctor = await response.json();
+        if (!doctor.is_doctor) {
+          console.warn(`⚠️ User ID ${id} is not a doctor`);
+          return null;
+        }
+
+        return {
+          id: doctor.id,
+          name: doctor.name || doctor.username || `Doctor ${id}`,
+          email: doctor.email || '',
+          username: doctor.username || `doctor${id}`,
+          is_doctor: true,
+          speciality: doctor.speciality || 'Dokter Hewan Umum',
+          phone: doctor.phone || null,
+        };
+      } catch (err) {
+        console.error(`❌ Error fetching doctor ID ${id}:`, err);
+        return null;
+      }
+    };
+
+      const doctorPromises = doctorIds.map(fetchDoctorById);
+    const doctorResults = await Promise.all(doctorPromises);
+    const validDoctors = doctorResults.filter((d): d is Doctor => d !== null);
+    return validDoctors.length > 0 ? validDoctors : getMockDoctorsData();
+
+  } catch (error) {
+    console.error('Error fetching doctors data:', error);
+    return getMockDoctorsData();
+  }
+};
+
   // Enhanced reservations data fetching with better logging
   const fetchReservationsData = async (): Promise<Reservation[]> => {
     console.log('📅 Starting fetchReservationsData...');
@@ -311,6 +417,7 @@ const HomeScreen: React.FC = () => {
           status: mapStatus(appointment.status || 'Pending'),
           doctorName: appointment.doctor_name || appointment.doctorName,
           notes: appointment.notes || '',
+          originalDate: ''
         };
       });
 
@@ -346,37 +453,55 @@ const HomeScreen: React.FC = () => {
 
 
   const formatDate = (dateString: string): string => {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return dateString;
-      }
-      
-      const options: Intl.DateTimeFormatOptions = { 
-        weekday: 'long', 
-        month: 'short', 
-        day: 'numeric' 
-      };
-      return date.toLocaleDateString('id-ID', options);
-    } catch {
-      return dateString;
+  if (!dateString) return 'Tanggal tidak ditentukan';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Tanggal tidak valid';
     }
-  };
+     // Mapping nama hari dalam bahasa Indonesia
+    const dayNames = [
+      'Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'
+    ];
+    
+    // Mapping nama bulan dalam bahasa Indonesia
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    
+    const dayName = dayNames[date.getDay()];
+    const monthName = monthNames[date.getMonth()];
+    const dayNumber = date.getDate();
+    
+    return `${dayName}, ${dayNumber} ${monthName}`;
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Tanggal tidak valid';
+  }
+};
 
-  const formatTime = (timeString: string): string => {
-    try {
-      if (timeString.includes(':')) {
-        const [hours, minutes] = timeString.split(':');
-        const hour = parseInt(hours);
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-        return `${displayHour.toString().padStart(2, '0')}.${minutes} ${ampm}`;
-      }
-      return timeString;
-    } catch {
-      return timeString;
+ const formatTime = (dateString: string): string => {
+  if (!dateString) return 'Time not set';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Invalid time';
     }
-  };
+    
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+    
+    return `${displayHour.toString().padStart(2, '0')}.${minutes.toString().padStart(2, '0')} ${ampm}`;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return 'Invalid time';
+  }
+};
 
   const mapStatus = (status: string): string => {
     const statusMap: Record<string, string> = {
@@ -424,6 +549,19 @@ const HomeScreen: React.FC = () => {
       date: 'Tuesday, Dec 20',
       time: '09.00 AM',
       status: 'Terjadwal',
+      originalDate: ''
+    }
+  ];
+
+  const getMockDoctorsData = (): Doctor[] => [
+    {
+      id: 1,
+      name: 'Dr. Teguh Prasetya',
+      email: 'teguh@example.com',
+      username: 'dr_teguh',
+      is_doctor: true,
+      speciality: 'Dokter Hewan Umum',
+      phone: null,
     }
   ];
 
@@ -466,10 +604,11 @@ const HomeScreen: React.FC = () => {
       
       // Load all data concurrently
       console.log('🔧 Starting concurrent data fetch...');
-      const [userData, petsData, reservationsData] = await Promise.allSettled([
+      const [userData, petsData, reservationsData, doctorIds] = await Promise.allSettled([
         fetchUserData(),
         fetchPetsData(),
-        fetchReservationsData()
+        fetchReservationsData(),
+        fetchDoctorsData()
       ]);
 
       console.log('📊 API Results:');
@@ -514,6 +653,15 @@ const HomeScreen: React.FC = () => {
         setReservations(getMockReservationsData());
       }
       
+      if (doctorIds.status === 'fulfilled' && doctorIds.value) {
+        console.log('✅ Setting doctors data:', doctorIds.value);
+        setDoctors(doctorIds.value.length > 0 ? doctorIds.value : getMockDoctorsData());
+    } else {
+        console.log('❌ Doctors data failed:', doctorIds.status === 'rejected' ? doctorIds.reason : 'No data');
+        setDoctors(getMockDoctorsData());
+    }
+
+
     } catch (error) {
       console.error('Error loading data:', error);
       setError(error instanceof Error ? error.message : 'Unknown error occurred');
@@ -530,6 +678,7 @@ const HomeScreen: React.FC = () => {
       });
       setPets(getMockPetsData());
       setReservations(getMockReservationsData());
+      setDoctors(getMockDoctorsData());
       
     } finally {
       setLoading(false);
@@ -552,7 +701,7 @@ const HomeScreen: React.FC = () => {
 
   const handlePetPress = useCallback((pet: Pet) => {
     console.log('Pet selected:', pet);
-    // navigation.navigate('PetDetail', { petId: pet.id });
+    //navigation.navigate('DetailPetScreen', { petId: pet.id });
   }, []);
 
   const handleReservationPress = useCallback((reservation: Reservation) => {
@@ -563,6 +712,11 @@ const HomeScreen: React.FC = () => {
   const handleReservationButton = useCallback(() => {
     navigation.navigate('Reservasi');
   }, [navigation]);
+
+  const handleDoctorPress = useCallback((doctor: Doctor) => {
+    console.log('Doctor selected:', doctor);
+    // navigation.navigate('DoctorDetail', { doctorId: doctor.id });
+  }, []);
 
   const handleViewReservations = useCallback(() => {
     navigation.navigate('ReservationList');
@@ -673,28 +827,154 @@ const HomeScreen: React.FC = () => {
     )}
   </View>
 
-  {/* Reservations Section */}
-  <View style={styles.section}>
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>Reservasi</Text>
-      <TouchableOpacity 
-        style={styles.ViewAllButton}
-        onPress={handleViewReservations}
-        activeOpacity={0.8}
-      >
+      {/* Reservations Section */}
+        <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Reservasi</Text>
+          <TouchableOpacity
+            style={styles.ViewAllButton}
+            onPress={handleViewReservations}
+            activeOpacity={0.8}
+          >
         <Text style={styles.ViewAllButtonText}>Lihat Semua</Text>
       </TouchableOpacity>
     </View>
   
-    {reservations.length > 0 ? (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.reservationsContainer}
-      >
-        {reservations.map((reservation) => (
-          <TouchableOpacity 
-            key={reservation.id} 
+  {reservations.length > 0 ? (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.reservationsContainer}
+    >
+      {/* Tampilkan 3 reservasi yang paling dekat dengan deadline */}
+      {[...reservations]
+        .filter((reservation) => {
+          // Filter hanya reservasi yang belum lewat dan belum selesai
+          try {
+            const reservationDate = reservation.originalDate || reservation.date;
+            const reservationTime = reservation.time;
+            
+            // Function untuk parse tanggal Indonesia
+            const parseIndonesianDate = (dateStr: string, timeStr?: string) => {
+              // Map hari Indonesia ke Inggris
+              const dayMap: { [key: string]: string } = {
+                'Senin': 'Monday', 'Selasa': 'Tuesday', 'Rabu': 'Wednesday',
+                'Kamis': 'Thursday', 'Jumat': 'Friday', 'Sabtu': 'Saturday', 'Minggu': 'Sunday'
+              };
+              
+              // Map bulan Indonesia ke angka
+              const monthMap: { [key: string]: number } = {
+                'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'Mei': 4, 'Jun': 5,
+                'Jul': 6, 'Agu': 7, 'Sep': 8, 'Okt': 9, 'Nov': 10, 'Des': 11
+              };
+              
+              // Parse tanggal: "Senin, 30 Jun" -> 30 Jun 2025
+              const dateMatch = dateStr.match(/\w+,\s*(\d+)\s*(\w+)/);
+              if (!dateMatch) return null;
+              
+              const day = parseInt(dateMatch[1]);
+              const month = monthMap[dateMatch[2]];
+              const year = 2025; // Asumsikan tahun 2025
+              
+              if (month === undefined) return null;
+              
+              let date = new Date(year, month, day);
+              
+              // Parse waktu jika ada: "04.00 PM" -> 16:00
+              if (timeStr) {
+                const timeMatch = timeStr.match(/(\d+)\.(\d+)\s*(AM|PM)/);
+                if (timeMatch) {
+                  let hours = parseInt(timeMatch[1]);
+                  const minutes = parseInt(timeMatch[2]);
+                  const period = timeMatch[3];
+                  
+                  if (period === 'PM' && hours !== 12) hours += 12;
+                  if (period === 'AM' && hours === 12) hours = 0;
+                  
+                  date.setHours(hours, minutes, 0, 0);
+                }
+              }
+              
+              return date;
+            };
+            
+            const parsedDate = parseIndonesianDate(reservationDate, reservationTime);
+            
+            if (!parsedDate) {
+              console.log('Could not parse date:', reservationDate, reservationTime);
+              return reservation.status !== 'Selesai';
+            }
+            
+            const now = new Date();
+            console.log('DateTime comparison:', { 
+              original: reservationDate + ' ' + reservationTime,
+              parsed: parsedDate.toISOString(), 
+              now: now.toISOString(),
+              isAfter: parsedDate > now 
+            });
+            
+            return parsedDate > now && reservation.status !== 'Selesai';
+          } catch (error) {
+            console.log('Error parsing date:', error);
+            return reservation.status !== 'Selesai';
+          }
+        })
+        .sort((a: any, b: any) => {
+          // Sort berdasarkan tanggal dan waktu (yang paling dekat duluan)
+          try {
+            // Function helper untuk parse tanggal Indonesia (sama seperti di atas)
+            const parseIndonesianDate = (dateStr: string, timeStr?: string) => {
+              const dayMap: { [key: string]: string } = {
+                'Senin': 'Monday', 'Selasa': 'Tuesday', 'Rabu': 'Wednesday',
+                'Kamis': 'Thursday', 'Jumat': 'Friday', 'Sabtu': 'Saturday', 'Minggu': 'Sunday'
+              };
+              const monthMap: { [key: string]: number } = {
+                'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'Mei': 4, 'Jun': 5,
+                'Jul': 6, 'Agu': 7, 'Sep': 8, 'Okt': 9, 'Nov': 10, 'Des': 11
+              };
+              
+              const dateMatch = dateStr.match(/\w+,\s*(\d+)\s*(\w+)/);
+              if (!dateMatch) return null;
+              
+              const day = parseInt(dateMatch[1]);
+              const month = monthMap[dateMatch[2]];
+              const year = 2025;
+              
+              if (month === undefined) return null;
+              
+              let date = new Date(year, month, day);
+              
+              if (timeStr) {
+                const timeMatch = timeStr.match(/(\d+)\.(\d+)\s*(AM|PM)/);
+                if (timeMatch) {
+                  let hours = parseInt(timeMatch[1]);
+                  const minutes = parseInt(timeMatch[2]);
+                  const period = timeMatch[3];
+                  
+                  if (period === 'PM' && hours !== 12) hours += 12;
+                  if (period === 'AM' && hours === 12) hours = 0;
+                  
+                  date.setHours(hours, minutes, 0, 0);
+                }
+              }
+              return date;
+            };
+            
+            const dateA = parseIndonesianDate(a.originalDate || a.date, a.time);
+            const dateB = parseIndonesianDate(b.originalDate || b.date, b.time);
+            
+            if (!dateA || !dateB) return 0;
+            
+            return dateA.getTime() - dateB.getTime();
+          } catch (error) {
+            console.log('Error sorting dates:', error);
+            return 0;
+          }
+        })
+        .slice(0, 3) // Ambil 3 reservasi yang paling dekat deadline
+        .map((reservation: Reservation) => (
+          <TouchableOpacity
+            key={reservation.id}
             style={styles.reservationCard}
             onPress={() => handleReservationPress(reservation)}
             activeOpacity={0.8}
@@ -703,49 +983,117 @@ const HomeScreen: React.FC = () => {
               <View style={styles.reservationIconContainer}>
                 <MaterialIcons name="pets" size={36} color="#2196F3" />
               </View>
-              <View style={styles.reservationInfo}>
-                <Text style={styles.reservationName} numberOfLines={1}>{reservation.petName}</Text>
-                <Text style={styles.reservationGender}>{reservation.gender}</Text>
-              </View>
-            </View>
-          
-            <View style={styles.reservationBottomRow}>
-              <View style={styles.datetimeContainer}>
-                <Text style={styles.reservationDate} numberOfLines={1}>{reservation.date}</Text>
-                <Text style={styles.reservationTime}>{reservation.time}</Text>
-              </View>
-              <View style={styles.statusContainer}>
-                <Text style={[styles.statusValue, { color: getStatusColor(reservation.status) }]}>
-                  {reservation.status}
+              <View style={styles.reservationTextContainer}>
+                <Text style={styles.reservationName} numberOfLines={1}>
+                  {reservation.petName}
                 </Text>
+                <Text style={styles.reservationDoctorName}>
+                  Dr. {reservation?.doctorName || reservation?.doctor_name || 'Unknown'}
+                </Text>
+                <View style={styles.reservationTimeContainer}>
+                  <Text style={styles.reservationTimeLabel}>
+                    {(() => {
+                      try {
+                        // Function helper untuk parse tanggal Indonesia
+                        const parseIndonesianDate = (dateStr: string, timeStr?: string) => {
+                          const monthMap: { [key: string]: number } = {
+                            'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'Mei': 4, 'Jun': 5,
+                            'Jul': 6, 'Agu': 7, 'Sep': 8, 'Okt': 9, 'Nov': 10, 'Des': 11
+                          };
+              
+                          const dateMatch = dateStr.match(/\w+,\s*(\d+)\s*(\w+)/);
+                          if (!dateMatch) return null;
+              
+                          const day = parseInt(dateMatch[1]);
+                          const month = monthMap[dateMatch[2]];
+                          const year = 2025;
+              
+                          if (month === undefined) return null;
+              
+                          let date = new Date(year, month, day);
+              
+                          if (timeStr) {
+                            const timeMatch = timeStr.match(/(\d+)\.(\d+)\s*(AM|PM)/);
+                            if (timeMatch) {
+                              let hours = parseInt(timeMatch[1]);
+                              const minutes = parseInt(timeMatch[2]);
+                              const period = timeMatch[3];
+                          
+                              if (period === 'PM' && hours !== 12) hours += 12;
+                              if (period === 'AM' && hours === 12) hours = 0;
+                          
+                              date.setHours(hours, minutes, 0, 0);
+                            }
+                          }
+                          return date;
+                        };
+                    
+                        const reservationDate = reservation.originalDate || reservation.date;
+                        const reservationTime = reservation.time;
+                        const parsedDate = parseIndonesianDate(reservationDate, reservationTime);
+                    
+                        if (!parsedDate) return '';
+                    
+                        const now = new Date();
+                        const timeDiff = parsedDate.getTime() - now.getTime();
+                        const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+                    
+                        if (daysDiff === 0) return 'Hari ini';
+                        if (daysDiff === 1) return 'Besok';
+                        if (daysDiff > 1) return `${daysDiff} hari lagi`;
+                        return `${Math.abs(daysDiff)} hari yang lalu`;
+                      } catch (error) {
+                        return '';
+                      }
+                    })()}
+                  </Text>
+                  <Text style={styles.reservationDateTime}>
+                    {reservation.date} • {reservation.time}
+                  </Text>
+                </View>
               </View>
+              <MaterialIcons name="chevron-right" size={24} color="#BDBDBD" />
             </View>
           </TouchableOpacity>
         ))}
-      </ScrollView>
-    ) : (
-      <View style={styles.emptyContainer}>
-        <MaterialIcons name="event-note" size={48} color="#ccc" />
-        <Text style={styles.emptyText}>Belum ada reservasi</Text>
-      </View>
-    )}
-  </View>
-
-        {/* Doctors Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Dokter Tersedia</Text>
-          <View style={styles.doctorsContainer}>
-            <View style={styles.doctorCard}>
-              <MaterialIcons name="medical-services" size={24} color="#008CFC" />
-              <Text style={styles.doctorName}>Dr. Teguh Prasetya</Text>
-              <Text style={styles.doctorSpecialty}>Dokter Hewan</Text>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
+    </ScrollView>
+  ) : (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.errorText}>Tidak ada reservasi</Text>
     </View>
-  );
+  )}
+</View>
+
+       {/* Doctors Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Dokter Tersedia</Text>
+        <View style={styles.doctorsContainer}>
+          {doctors.length > 0 ? (
+            doctors.map((doctor) => (
+              <TouchableOpacity
+                key={doctor.id}
+                style={styles.doctorCard}
+                onPress={() => handleDoctorPress(doctor)}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="medical-services" size={24} color="#008CFC" />
+                <Text style={styles.doctorCard}>{doctor.name}</Text>
+
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptyContainer}>
+              <MaterialIcons name="medical-services" size={48} color="#ccc" />
+              <Text style={styles.emptyText}>Belum ada dokter tersedia</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </ScrollView>
+  </View>
+);
 };
+export default HomeScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -947,7 +1295,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 4,  
     elevation: 3,
   },
   reservationTopRow: {
@@ -964,7 +1312,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  reservationInfo: {
+  // Updated: Change from reservationInfo to reservationTextContainer
+  reservationTextContainer: {
     flex: 1,
   },
   reservationName: {
@@ -972,10 +1321,21 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  reservationGender: {
+  // Added: Reservation doctor name style (same as reservation list)
+  reservationDoctorName: {
     fontSize: 14,
-    color: '#666',
+    color: '#2196F3',
+    fontWeight: '500',
+    marginTop: 2,
   },
+  // Added: Notes style (same as reservation list)
+  reservationNotes: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  // Removed: reservationGender (not needed anymore)
   reservationBottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -984,6 +1344,23 @@ const styles = StyleSheet.create({
     borderTopColor: '#eee',
     paddingTop: 12,
   },
+  reservationTimeContainer: {
+    alignItems: 'flex-start',
+  },
+  
+  reservationTimeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 2,
+  },
+  
+  reservationDateTime: {
+    fontSize: 11,
+    color: '#757575',
+    fontWeight: '400',
+  },
+
   datetimeContainer: {
     flex: 1,
   },
@@ -1000,9 +1377,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  // Added: Status badge style (same as reservation list)
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
   statusValue: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   doctorsContainer: {
     flexDirection: 'row',
@@ -1015,7 +1398,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  doctorName: {
+  availableDoctorName: {
     marginTop: 8,
     fontWeight: '500',
   },
@@ -1030,6 +1413,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-});
-
-export default HomeScreen;
+}); 

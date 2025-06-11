@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons,Ionicons } from '@expo/vector-icons';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Auth Screens
 import { LoginScreen } from './services/Screens/LoginScreen';
@@ -104,8 +105,19 @@ export type RootStackParamList = {
   DoctorHome: undefined;
   MainTabs: undefined;
   Reservasi: undefined;
-  DetailPetScreen: undefined;
-  DetailReservation: undefined;
+  AddPetScreen: undefined;
+  DetailPetScreen: { 
+    petId: string | number; 
+    petName?: string; 
+    fromAddPet?: boolean;
+    petData?: any; 
+  };
+    DetailReservation: {  
+    reservationId: string | number;
+    petName?: string;
+    fromReservasi?: boolean;
+    reservationData?: any;
+  };
   ReservationList?: {
   newReservation?: {
     id: string;
@@ -122,8 +134,7 @@ export type RootStackParamList = {
   ReservationSuccess: { appointmentId: number };
   Profile: { refresh?: boolean } | undefined;
   EditProfile: undefined;
-  ChangePassword: undefined;
-  AddPetScreen: undefined;
+  ChangePassword: undefined; 
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

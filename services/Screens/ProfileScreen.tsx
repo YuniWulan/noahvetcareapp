@@ -188,8 +188,13 @@ const ProfileScreen = () => {
               <TouchableOpacity 
                 key={pet.id} 
                 style={styles.petCard}
-                onPress={() => navigation.navigate('DetailPetScreen')}
-              >
+                onPress={() => {
+                console.log('Navigasi ke DetailPetScreen dengan petId:', pet.id);
+                  navigation.navigate('DetailPetScreen', {
+                  petId: pet.id,
+                  petName: pet.pet_name,
+                });
+              }}>
                 <MaterialIcons name="pets" size={24} color="#2196F3" style={styles.petIcon} />
                 <Text style={styles.petName}>{pet.pet_name}</Text>
               </TouchableOpacity>

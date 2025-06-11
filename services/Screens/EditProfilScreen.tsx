@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, SafeAreaVie
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type EditProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'EditProfile'>;
@@ -107,17 +107,13 @@ const EditProfileScreen = () => {
         <View style={styles.headerRightPlaceholder} />
       </View>
 
-      <View style={styles.container}>
-        <View style={styles.profileImageContainer}>
-          <Image 
-            source={require('../../assets/user-image.jpg')}
-            style={styles.profileImage}
-          />
-          <TouchableOpacity style={styles.editImageButton}>
-            <Ionicons name="camera" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
+      <View style={styles.iconContainer}>
+        <View style={[styles.petIconContainer]}>
+          <MaterialIcons name="account-circle" size={100} color="#2196F3" />
+          </View>
+      </View> 
 
+      <View style={styles.container}>
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Nama Pengguna*</Text>
           <TextInput
@@ -149,7 +145,7 @@ const EditProfileScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fffff',
   },
   header: {
     marginTop: 32,
@@ -176,15 +172,16 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  profileImageContainer: {
+  iconContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginVertical: 15,
   },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 10,
+  petIconContainer: {
+    width: 110,
+    height: 110,
+    borderRadius: 45,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   editImageButton: {
     position: 'absolute',
