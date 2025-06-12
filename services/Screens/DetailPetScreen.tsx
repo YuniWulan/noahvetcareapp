@@ -47,6 +47,21 @@ type PetApiResponse = {
   nextAppointment?: string;
 };
 
+type DoctorData = {
+  username: string;
+  email?: string;
+  name?: string;
+  full_name?: string;
+  id?: string;
+  user_id?: string;
+  _id?: string;
+  specialization?: string;
+  license_number?: string;
+  phone?: string;
+  experience?: string;
+  education?: string;
+  about?: string;
+};
 const formatAge = (months: number): string => {
   if (months < 12) return `${months} Bulan`;
   const years = Math.floor(months / 12);

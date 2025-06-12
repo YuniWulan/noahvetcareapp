@@ -17,8 +17,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { NavigationProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RootStackParamList } from '../../App';
-
+import { RootStackParamList, DoctorData } from '../../App';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
  
@@ -41,7 +40,9 @@ interface User {
 }
 
 interface Doctor {
-  id: number;
+  license_number: string;
+  specialization: string;
+  id: string | number;
   name: string;
   email: string;
   username: string;
@@ -140,7 +141,7 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-   const fetchFromAPI = async (endpoint: string, token: string) => {
+  const fetchFromAPI = async (endpoint: string, token: string) => {
     const response = await fetchWithTimeout(`${API_BASE_URL}${endpoint}`, {
       method: 'GET',
       headers: {
@@ -236,128 +237,130 @@ const HomeScreen: React.FC = () => {
 
   // Enhanced pets data fetching with better logging
   const fetchPetsData = async (): Promise<Pet[]> => {
-  console.log('🐾 Starting fetchPetsData...');
-  try {
-    const token = await getAuthToken();
-    const userId = await getUserId();
-    
-    if (!token || !userId) {
-      throw new Error('Authentication credentials not found');
-    }
+    console.log('🐾 Starting fetchPetsData...');
+    try {
+      const token = await getAuthToken();
+      const userId = await getUserId();
+      
+      if (!token || !userId) {
+        throw new Error('Authentication credentials not found');
+      }
 
-    const response = await fetchWithTimeout(`${API_BASE_URL}/v1/api/pet/lists/${userId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+      const response = await fetchWithTimeout(`${API_BASE_URL}/v1/api/pet/lists/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP Error: ${response.status}`);
-    }
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status}`);
+      }
 
-    const data = await response.json();
-    console.log("API result:", data);
-    
-    // Handle the response structure from ProfileScreen
-    let pets: any[] = [];
-    if (data.petData && Array.isArray(data.petData)) {
-      pets = data.petData;
-    } else if (data.data && Array.isArray(data.data)) {
-      pets = data.data;
-    } else if (Array.isArray(data)) {
-      pets = data;
-    }
+      const data = await response.json();
+      console.log("API result:", data);
+      
+      // Handle the response structure from ProfileScreen
+      let pets: any[] = [];
+      if (data.petData && Array.isArray(data.petData)) {
+        pets = data.petData;
+      } else if (data.data && Array.isArray(data.data)) {
+        pets = data.data;
+      } else if (Array.isArray(data)) {
+        pets = data;
+      }
 
-    console.log(`🐾 Found ${pets.length} pets`);
+      console.log(`🐾 Found ${pets.length} pets`);
 
       // Transform and validate pet data
-     const transformedPets = pets.map((pet: any, index: number) => {
-      return {
-        id: (pet.id || pet.pet_id || `pet_${index}`).toString(),
-        name: pet.name || pet.pet_name || `Pet ${index + 1}`,
-        pet_name: pet.pet_name || pet.name || `Pet ${index + 1}`, // Keep both for compatibility
-        type: pet.type || pet.pet_type || pet.species || 'Unknown',
-        breed: pet.breed || pet.pet_breed || 'Unknown',
-        age: Math.max(0, parseInt(pet.age || pet.pet_age || '0') || 0),
-      };
-    });
-
-    return transformedPets;
-
-  } catch (error) {
-    console.error('Error fetching pets data:', error);
-    // Return empty array instead of mock data to match ProfileScreen behavior
-    return [];
-  }
-};
-
-// Enhanced doctor data fetching
- const fetchDoctorsData = async (): Promise<Doctor[]> => {
-  console.log('👨‍⚕️ Starting fetchDoctorsData...');
-
- try {
-    const token = await getAuthToken();
-    if (!token) return getMockDoctorsData();
-
-    // Ambil daftar doctorId dari janji terlebih dahulu (misal dari fetchReservationsData)
-    const appointmentDoctorsIds = [8]; // Contoh ambil dari hasil janji
-    
-    // Gabungkan dengan doctorIds tetap kalau perlu
-    const doctorId = Array.from(new Set([...appointmentDoctorsIds, 1]));
-
-    const doctorIds = [7, 8,]; // contoh beberapa dokter
-
-    const fetchDoctorById = async (id: number): Promise<Doctor | null> => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/v1/api/user/details/${id}`, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            console.warn(`⚠️ Doctor with ID ${id} not found (404)`);
-          } else {
-            console.warn(`⚠️ Failed to fetch doctor with ID ${id}, status: ${response.status}`);
-          }
-          return null;
-        }
-
-        const doctor = await response.json();
-        if (!doctor.is_doctor) {
-          console.warn(`⚠️ User ID ${id} is not a doctor`);
-          return null;
-        }
-
+      const transformedPets = pets.map((pet: any, index: number) => {
         return {
-          id: doctor.id,
-          name: doctor.name || doctor.username || `Doctor ${id}`,
-          email: doctor.email || '',
-          username: doctor.username || `doctor${id}`,
-          is_doctor: true,
-          speciality: doctor.speciality || 'Dokter Hewan Umum',
-          phone: doctor.phone || null,
+          id: (pet.id || pet.pet_id || `pet_${index}`).toString(),
+          name: pet.name || pet.pet_name || `Pet ${index + 1}`,
+          pet_name: pet.pet_name || pet.name || `Pet ${index + 1}`, // Keep both for compatibility
+          type: pet.type || pet.pet_type || pet.species || 'Unknown',
+          breed: pet.breed || pet.pet_breed || 'Unknown',
+          age: Math.max(0, parseInt(pet.age || pet.pet_age || '0') || 0),
         };
-      } catch (err) {
-        console.error(`❌ Error fetching doctor ID ${id}:`, err);
-        return null;
-      }
-    };
+      });
+
+      return transformedPets;
+
+    } catch (error) {
+      console.error('Error fetching pets data:', error);
+      // Return empty array instead of mock data to match ProfileScreen behavior
+      return [];
+    }
+  };
+
+  // Enhanced doctor data fetching
+  const fetchDoctorsData = async (): Promise<Doctor[]> => {
+    console.log('👨‍⚕️ Starting fetchDoctorsData...');
+
+    try {
+      const token = await getAuthToken();
+      if (!token) return getMockDoctorsData();
+
+      // Ambil daftar doctorId dari janji terlebih dahulu (misal dari fetchReservationsData)
+      const appointmentDoctorsIds = [8]; // Contoh ambil dari hasil janji
+      
+      // Gabungkan dengan doctorIds tetap kalau perlu
+      const doctorId = Array.from(new Set([...appointmentDoctorsIds, 1]));
+
+      const doctorIds = [7, 8]; // contoh beberapa dokter
+
+      const fetchDoctorById = async (id: number): Promise<Doctor | null> => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/v1/api/user/details/${id}`, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!response.ok) {
+            if (response.status === 404) {
+              console.warn(`⚠️ Doctor with ID ${id} not found (404)`);
+            } else {
+              console.warn(`⚠️ Failed to fetch doctor with ID ${id}, status: ${response.status}`);
+            }
+            return null;
+          }
+
+          const doctor = await response.json();
+          if (!doctor.is_doctor) {
+            console.warn(`⚠️ User ID ${id} is not a doctor`);
+            return null;
+          }
+
+          return {
+            id: doctor.id,
+            name: doctor.name || doctor.username || `Doctor ${id}`,
+            email: doctor.email || '',
+            username: doctor.username || `doctor${id}`,
+            is_doctor: true,
+            speciality: doctor.speciality || 'Dokter Hewan Umum',
+            phone: doctor.phone || null,
+            license_number: doctor.license_number || `LIC-${id}`,
+            specialization: doctor.specialization || doctor.speciality || 'Dokter Hewan Umum'
+          };
+        } catch (err) {
+          console.error(`❌ Error fetching doctor ID ${id}:`, err);
+          return null;
+        }
+      };
 
       const doctorPromises = doctorIds.map(fetchDoctorById);
-    const doctorResults = await Promise.all(doctorPromises);
-    const validDoctors = doctorResults.filter((d): d is Doctor => d !== null);
-    return validDoctors.length > 0 ? validDoctors : getMockDoctorsData();
+      const doctorResults = await Promise.all(doctorPromises);
+      const validDoctors = doctorResults.filter((d): d is Doctor => d !== null);
+      return validDoctors.length > 0 ? validDoctors : getMockDoctorsData();
 
-  } catch (error) {
-    console.error('Error fetching doctors data:', error);
-    return getMockDoctorsData();
-  }
-};
+    } catch (error) {
+      console.error('Error fetching doctors data:', error);
+      return getMockDoctorsData();
+    }
+  };
 
   // Enhanced reservations data fetching with better logging
   const fetchReservationsData = async (): Promise<Reservation[]> => {
@@ -417,7 +420,7 @@ const HomeScreen: React.FC = () => {
           status: mapStatus(appointment.status || 'Pending'),
           doctorName: appointment.doctor_name || appointment.doctorName,
           notes: appointment.notes || '',
-          originalDate: ''
+          originalDate: appointment.date || appointment.appointment_date || ''
         };
       });
 
@@ -451,57 +454,56 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-
   const formatDate = (dateString: string): string => {
-  if (!dateString) return 'Tanggal tidak ditentukan';
-  
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
+    if (!dateString) return 'Tanggal tidak ditentukan';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Tanggal tidak valid';
+      }
+      // Mapping nama hari dalam bahasa Indonesia
+      const dayNames = [
+        'Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'
+      ];
+      
+      // Mapping nama bulan dalam bahasa Indonesia
+      const monthNames = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+      ];
+      
+      const dayName = dayNames[date.getDay()];
+      const monthName = monthNames[date.getMonth()];
+      const dayNumber = date.getDate();
+      
+      return `${dayName}, ${dayNumber} ${monthName}`;
+    } catch (error) {
+      console.error('Error formatting date:', error);
       return 'Tanggal tidak valid';
     }
-     // Mapping nama hari dalam bahasa Indonesia
-    const dayNames = [
-      'Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'
-    ];
-    
-    // Mapping nama bulan dalam bahasa Indonesia
-    const monthNames = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
-    ];
-    
-    const dayName = dayNames[date.getDay()];
-    const monthName = monthNames[date.getMonth()];
-    const dayNumber = date.getDate();
-    
-    return `${dayName}, ${dayNumber} ${monthName}`;
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return 'Tanggal tidak valid';
-  }
-};
+  };
 
- const formatTime = (dateString: string): string => {
-  if (!dateString) return 'Time not set';
-  
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
+  const formatTime = (dateString: string): string => {
+    if (!dateString) return 'Time not set';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid time';
+      }
+      
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+      
+      return `${displayHour.toString().padStart(2, '0')}.${minutes.toString().padStart(2, '0')} ${ampm}`;
+    } catch (error) {
+      console.error('Error formatting time:', error);
       return 'Invalid time';
     }
-    
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-    
-    return `${displayHour.toString().padStart(2, '0')}.${minutes.toString().padStart(2, '0')} ${ampm}`;
-  } catch (error) {
-    console.error('Error formatting time:', error);
-    return 'Invalid time';
-  }
-};
+  };
 
   const mapStatus = (status: string): string => {
     const statusMap: Record<string, string> = {
@@ -549,19 +551,21 @@ const HomeScreen: React.FC = () => {
       date: 'Tuesday, Dec 20',
       time: '09.00 AM',
       status: 'Terjadwal',
-      originalDate: ''
+      originalDate: '2024-12-20T09:00:00Z'
     }
   ];
-
+  
   const getMockDoctorsData = (): Doctor[] => [
     {
-      id: 1,
+      id: 1, // gunakan number, bukan string
       name: 'Dr. Teguh Prasetya',
       email: 'teguh@example.com',
       username: 'dr_teguh',
       is_doctor: true,
-      speciality: 'Dokter Hewan Umum',
-      phone: null,
+      specialization: 'Dokter Hewan Umum',
+      license_number: 'SIP/001/2024',
+      phone: '+6281234567890',
+      speciality: null
     }
   ];
 
@@ -604,7 +608,7 @@ const HomeScreen: React.FC = () => {
       
       // Load all data concurrently
       console.log('🔧 Starting concurrent data fetch...');
-      const [userData, petsData, reservationsData, doctorIds] = await Promise.allSettled([
+      const [userData, petsData, reservationsData, doctorsData] = await Promise.allSettled([
         fetchUserData(),
         fetchPetsData(),
         fetchReservationsData(),
@@ -615,6 +619,7 @@ const HomeScreen: React.FC = () => {
       console.log('- User data:', userData.status);
       console.log('- Pets data:', petsData.status);
       console.log('- Reservations data:', reservationsData.status);
+      console.log('- Doctors data:', doctorsData.status);
 
       // Handle user data
       if (userData.status === 'fulfilled' && userData.value) {
@@ -653,14 +658,13 @@ const HomeScreen: React.FC = () => {
         setReservations(getMockReservationsData());
       }
       
-      if (doctorIds.status === 'fulfilled' && doctorIds.value) {
-        console.log('✅ Setting doctors data:', doctorIds.value);
-        setDoctors(doctorIds.value.length > 0 ? doctorIds.value : getMockDoctorsData());
-    } else {
-        console.log('❌ Doctors data failed:', doctorIds.status === 'rejected' ? doctorIds.reason : 'No data');
+      if (doctorsData.status === 'fulfilled' && doctorsData.value) {
+        console.log('✅ Setting doctors data:', doctorsData.value);
+        setDoctors(doctorsData.value.length > 0 ? doctorsData.value : getMockDoctorsData());
+      } else {  
+        console.log('❌ Doctors data failed:', doctorsData.status === 'rejected' ? doctorsData.reason : 'No data');
         setDoctors(getMockDoctorsData());
-    }
-
+      }
 
     } catch (error) {
       console.error('Error loading data:', error);
@@ -701,13 +705,13 @@ const HomeScreen: React.FC = () => {
 
   const handlePetPress = useCallback((pet: Pet) => {
     console.log('Pet selected:', pet);
-    //navigation.navigate('DetailPetScreen', { petId: pet.id });
-  }, []);
+    navigation.navigate('DetailPetScreen', { petId: pet.id });
+  }, [navigation]);
 
   const handleReservationPress = useCallback((reservation: Reservation) => {
     console.log('Reservation selected:', reservation);
-    // navigation.navigate('ReservationDetail', { reservationId: reservation.id });
-  }, []);
+    //navigation.navigate('DetailReservation', { reservationId: reservation.id });
+  }, [navigation]);
 
   const handleReservationButton = useCallback(() => {
     navigation.navigate('Reservasi');
@@ -715,8 +719,10 @@ const HomeScreen: React.FC = () => {
 
   const handleDoctorPress = useCallback((doctor: Doctor) => {
     console.log('Doctor selected:', doctor);
-    // navigation.navigate('DoctorDetail', { doctorId: doctor.id });
-  }, []);
+    //navigation.navigate('ViewDoctorProfile', {
+      //doctorData: doctor 
+    //});
+  }, [navigation]);
 
   const handleViewReservations = useCallback(() => {
     navigation.navigate('ReservationList');
@@ -1067,6 +1073,11 @@ const HomeScreen: React.FC = () => {
        {/* Doctors Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Dokter Tersedia</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.reservationsContainer}
+          >
         <View style={styles.doctorsContainer}>
           {doctors.length > 0 ? (
             doctors.map((doctor) => (
@@ -1086,12 +1097,13 @@ const HomeScreen: React.FC = () => {
               <MaterialIcons name="medical-services" size={48} color="#ccc" />
               <Text style={styles.emptyText}>Belum ada dokter tersedia</Text>
             </View>
-          )}
+              )}
+            </View>
+          </ScrollView>
         </View>
-      </View>
-    </ScrollView>
-  </View>
-);
+      </ScrollView>
+    </View>
+  );
 };
 export default HomeScreen;
 

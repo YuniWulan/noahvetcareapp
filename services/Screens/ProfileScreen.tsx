@@ -125,22 +125,41 @@ const ProfileScreen = () => {
     navigation.navigate('AddPetScreen');
   };
 
-  const handleMenuItemPress = async (title: string) => {
-    switch (title) {
-      case 'Ubah Kata Sandi':
-        navigation.navigate('ChangePassword');
-        break;
-      case 'Syarat & Ketentuan':
-        break; 
-      case 'Log Out':
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('user');
-        navigation.replace('Login');
-        break;
-      default:
-        console.log(`${title} pressed`);
-    }
-  };
+const handleMenuItemPress = async (title: string) => {
+  switch (title) {
+    case 'Ubah Kata Sandi':
+      navigation.navigate('ChangePassword');
+      break;
+    case 'Syarat & Ketentuan':
+      // Implement terms and conditions
+      break;
+    case 'Log Out':
+      Alert.alert(
+        'Konfirmasi',
+        'Apakah Anda yakin ingin keluar?',
+        [
+          { text: 'Batal', style: 'cancel' },
+          {
+            text: 'Ya',
+            onPress: async () => {
+              try {
+                await AsyncStorage.removeItem('token');
+                await AsyncStorage.removeItem('user');
+                navigation.replace('Login');
+              } catch (error) {
+                console.error('Error during logout:', error);
+                Alert.alert('Error', 'Terjadi kesalahan saat logout');
+              }
+            }
+          }
+        ]
+      );
+      break;
+    default:
+      console.log(`${title} pressed`);
+  }
+};
+
 
   if (loading) {
     return (

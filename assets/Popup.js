@@ -1,14 +1,26 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
   Modal,
   StyleSheet,
   Image,
+  TouchableOpacity,
   TouchableWithoutFeedback,
 } from 'react-native';
 
-const PasswordUpdatedModal = ({ visible, onClose }) => {
+const PasswordUpdatedModal = ({ visible, onClose, autoCloseDelay = 1000 }) => {
+  // Auto close modal setelah delay tertentu
+ useEffect(() => {
+    if (visible) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, autoCloseDelay);
+
+      // Cleanup timer jika modal ditutup manual atau component unmount
+      return () => clearTimeout(timer);
+    }
+  }, [visible, onClose, autoCloseDelay]);
   return (
     <Modal
       visible={visible}
@@ -28,12 +40,7 @@ const PasswordUpdatedModal = ({ visible, onClose }) => {
               <Text style={styles.message}>
                 <Text style={styles.success}>Selamat! </Text>
                 Kata sandi anda telah berhasil untuk diperbarui
-              </Text>
-              
-              <TouchableOpacity style={styles.button} onPress={onClose}>
-                <Text style={styles.buttonText}>OK</Text>
-              </TouchableOpacity>
-
+              </Text> 
             </View>
           </TouchableWithoutFeedback>
         </View>
@@ -56,6 +63,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     width: '85%',
     alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   icon: {
     width: 96,
@@ -68,17 +83,34 @@ const styles = StyleSheet.create({
     color: '#000',
     marginBottom: 12,
     textAlign: 'center',
+    fontFamily: 'Lexend-Regular',
   },
   message: {
     fontSize: 14,
     color: '#333',
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 24,
+    fontFamily: 'Lexend-Regular',
   },
   success: {
-    color: '#007AFF', 
+    color: '#007AFF',
     fontWeight: 'bold',
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    minWidth: 100,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontFamily: 'Lexend-Regular',
   },
 });
 
-export default PasswordUpdatedModal;
+export default PasswordUpdatedModal; 

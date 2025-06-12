@@ -102,7 +102,7 @@ export const LoginScreen = ({ navigation }: Props) => {
       await AsyncStorage.setItem("user_id", user_id.toString());
 
       if (userData.is_doctor) {
-        navigation.navigate("DoctorHome");
+        navigation.navigate("DoctorTabs");
       } else {
         navigation.navigate("MainTabs");
       }

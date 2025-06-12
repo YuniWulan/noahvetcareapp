@@ -81,6 +81,16 @@ type APIMedicalRecordList = {
   medical_records: APIMedicalRecord[];
 };
 
+// Helper function to create mock response with json method
+const createMockResponse = (data: any, ok: boolean = false): Response => {
+  return {
+    ok,
+    json: () => Promise.resolve(data),
+    status: ok ? 200 : 500,
+    statusText: ok ? 'OK' : 'Error'
+  } as Response;
+};
+
 const TransactionScreen = () => {
   const [activeTab, setActiveTab] = useState<TransactionType>('petshop');
   const [transactions, setTransactions] = useState<{
@@ -91,7 +101,6 @@ const TransactionScreen = () => {
     petclinic: []
   });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<APIUserDetail | null>(null);
 
   // Get JWT token from AsyncStorage
@@ -123,7 +132,8 @@ const TransactionScreen = () => {
       
       const token = await getAuthToken();
       if (!token) {
-        throw new Error('No authentication token found');
+        console.warn('⚠️ No authentication token found');
+        return null;
       }
 
       let userId = await AsyncStorage.getItem('userId');
@@ -134,7 +144,8 @@ const TransactionScreen = () => {
         console.log('🆔 User ID from user_id key:', userId);
       }
       if (!userId) {
-        throw new Error('No user ID found');
+        console.warn('⚠️ No user ID found');
+        return null;
       }
 
       console.log('🌐 Fetching user details for ID:', userId);
@@ -149,13 +160,8 @@ const TransactionScreen = () => {
       console.log('📡 User details response status:', response.status);
       
       if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('User not found');
-        }
-        if (response.status === 401) {
-          throw new Error('Authentication failed - invalid token');
-        }
-        throw new Error(`Failed to fetch user details: ${response.status}`);
+        console.warn(`⚠️ Failed to fetch user details: ${response.status}`);
+        return null;
       }
 
       const userData: APIUserDetail = await response.json();
@@ -163,13 +169,15 @@ const TransactionScreen = () => {
       return userData;
     } catch (error) {
       console.error('❌ Error fetching user details:', error);
-      throw error;
+      return null;
     }
   };
 
   // Format tanggal ke bahasa Indonesia
   const formatDate = (dateString: string): string => {
     try {
+      if (!dateString) return 'Tanggal tidak tersedia';
+      
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
         return dateString;
@@ -183,21 +191,37 @@ const TransactionScreen = () => {
       return date.toLocaleDateString('id-ID', options);
     } catch (error) {
       console.error('Error formatting date:', error);
-      return dateString;
+      return dateString || 'Tanggal tidak tersedia';
     }
   };
 
   // Format currency ke Rupiah
   const formatCurrency = (amount: number): string => {
     try {
+      if (isNaN(amount) || amount === null || amount === undefined) {
+        return 'Rp0';
+      }
       return `Rp${amount.toLocaleString('id-ID')}`;
     } catch (error) {
       console.error('Error formatting currency:', error);
-      return `Rp${amount}`;
+      return `Rp${amount || 0}`;
     }
   };
 
-  // OPTIMIZED: Unified API fetcher with consistent endpoints
+  // FIXED: Safe array access with null checks
+  const safeArrayAccess = (data: any, fallback: any[] = []): any[] => {
+    if (!data) return fallback;
+    if (Array.isArray(data)) return data;
+    if (data.transactions && Array.isArray(data.transactions)) return data.transactions;
+    if (data.appointments && Array.isArray(data.appointments)) return data.appointments;
+    if (data.productData && Array.isArray(data.productData)) return data.productData;
+    if (data.medical_records && Array.isArray(data.medical_records)) return data.medical_records;
+    if (data.pets && Array.isArray(data.pets)) return data.pets;
+    if (data.data && Array.isArray(data.data)) return data.data;
+    return fallback;
+  };
+
+  // OPTIMIZED: Unified API fetcher with consistent endpoints and better error handling
   const fetchOptimizedData = async (userID: number, token: string) => {
     try {
       console.log('🚀 Starting OPTIMIZED transaction loading...');
@@ -212,42 +236,72 @@ const TransactionScreen = () => {
         transactionDetails: (txId: number) => `https://noahvetcare.naufalalfa.com/v1/api/transaction/details/${txId}`
       };
 
-      // Parallel fetch for main data
-      const [transactionsResponse, appointmentsResponse, productsResponse] = await Promise.all([
+      // Parallel fetch for main data with error handling
+      const fetchPromises = [
         fetch(API_ENDPOINTS.transactions, {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        }).catch(err => {
+          console.warn('⚠️ Failed to fetch transactions:', err);
+          return createMockResponse({ transactions: [] }, false);
         }),
         fetch(API_ENDPOINTS.appointments, {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        }).catch(err => {
+          console.warn('⚠️ Failed to fetch appointments:', err);
+          return createMockResponse({ appointments: [] }, false);
         }),
         fetch(API_ENDPOINTS.products, {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        }).catch(err => {
+          console.warn('⚠️ Failed to fetch products:', err);
+          return createMockResponse({ productData: [] }, false);
         })
-      ]);
+      ];
 
-      // Process transactions
+      const [transactionsResponse, appointmentsResponse, productsResponse] = await Promise.all(fetchPromises);
+
+      // Process transactions with safe access
       let transactionData: APITransactionList = { transactions: [] };
-      if (transactionsResponse.ok) {
-        transactionData = await transactionsResponse.json();
-        console.log('✅ Transactions fetched:', transactionData.transactions.length);
+      try {
+        if (transactionsResponse.ok) {
+          const rawData = await transactionsResponse.json();
+          transactionData.transactions = safeArrayAccess(rawData);
+          console.log('✅ Transactions fetched:', transactionData.transactions.length);
+        }
+      } catch (error) {
+        console.warn('⚠️ Error processing transaction data:', error);
       }
 
-      // Process appointments
+      // Process appointments with safe access
       let appointmentData: APIAppointmentList = { appointments: [] };
-      if (appointmentsResponse.ok) {
-        appointmentData = await appointmentsResponse.json();
-        console.log('✅ Appointments fetched:', appointmentData.appointments.length);
+      try {
+        if (appointmentsResponse.ok) {
+          const rawData = await appointmentsResponse.json();
+          appointmentData.appointments = safeArrayAccess(rawData);
+          appointmentData.price = rawData?.price;
+          console.log('✅ Appointments fetched:', appointmentData.appointments.length);
+        }
+      } catch (error) {
+        console.warn('⚠️ Error processing appointment data:', error);
       }
 
-      // Process products for category mapping
+      // Process products for category mapping with safe access
       let productCategoryMap = new Map<number, string>();
-      if (productsResponse.ok) {
-        const productData: APIProductList = await productsResponse.json();
-        productData.productData.forEach((product, index) => {
-          const productId = (product as any).id || (product as any).product_id || (index + 1);
-          productCategoryMap.set(productId, product.category);
-        });
-        console.log('✅ Product categories mapped:', productCategoryMap.size);
+      try {
+        if (productsResponse.ok) {
+          const rawData = await productsResponse.json();
+          const productArray = safeArrayAccess(rawData);
+          productArray.forEach((product, index) => {
+            if (product && typeof product === 'object') {
+              const productId = product.id || product.product_id || (index + 1);
+              const category = product.category || 'Unknown';
+              productCategoryMap.set(productId, category);
+            }
+          });
+          console.log('✅ Product categories mapped:', productCategoryMap.size);
+        }
+      } catch (error) {
+        console.warn('⚠️ Error processing product data:', error);
       }
 
       // Get medical records for cross-reference
@@ -262,17 +316,32 @@ const TransactionScreen = () => {
       };
     } catch (error) {
       console.error('❌ Error in optimized data fetch:', error);
-      throw error;
+      // Return safe default data instead of throwing
+      return {
+        transactionData: { transactions: [] },
+        appointmentData: { appointments: [] },
+        productCategoryMap: new Map(),
+        medicalTransactionIds: new Set(),
+        API_ENDPOINTS: {}
+      };
     }
   };
 
-  // OPTIMIZED: Medical records fetcher
+  // OPTIMIZED: Medical records fetcher with better error handling
   const fetchMedicalRecordsOptimized = async (userID: number, token: string, endpoints: any) => {
     try {
       console.log('🏥 Fetching medical records for transaction cross-reference...');
       
+      if (!endpoints.pets) {
+        console.warn('⚠️ No pets endpoint available');
+        return new Set();
+      }
+
       const petsResponse = await fetch(endpoints.pets, {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      }).catch(err => {
+        console.warn('⚠️ Failed to fetch pets:', err);
+        return createMockResponse(null, false);
       });
       
       if (!petsResponse.ok) {
@@ -280,49 +349,54 @@ const TransactionScreen = () => {
         return new Set();
       }
       
-      const petsData = await petsResponse.json();
-      let allPets = [];
-      
-      if (petsData.pets && Array.isArray(petsData.pets)) {
-        allPets = petsData.pets;
-      } else if (petsData.data && Array.isArray(petsData.data)) {
-        allPets = petsData.data;
-      } else if (Array.isArray(petsData)) {
-        allPets = petsData;
+      const petsData = await petsResponse.json().catch(err => {
+        console.warn('⚠️ Error parsing pets data:', err);
+        return null;
+      });
+
+      if (!petsData) {
+        return new Set();
       }
       
-      const userPets = allPets.filter((pet: any) => 
-        pet.user_id === userID || pet.owner_id === userID || 
-        pet.userId === userID || pet.ownerId === userID
-      );
+      const allPets = safeArrayAccess(petsData);
+      
+      const userPets = allPets.filter((pet: any) => {
+        if (!pet || typeof pet !== 'object') return false;
+        return pet.user_id === userID || pet.owner_id === userID || 
+               pet.userId === userID || pet.ownerId === userID;
+      });
       
       const medicalTransactionIds = new Set();
       
-      // Fetch medical records for each pet
+      // Fetch medical records for each pet with error handling
       for (const pet of userPets) {
         try {
+          if (!pet || typeof pet !== 'object') continue;
+          
           const petId = pet.id || pet.pet_id;
+          if (!petId) continue;
+
           const medicalResponse = await fetch(endpoints.medicalRecords(petId), {
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+          }).catch(err => {
+            console.warn(`⚠️ Failed to fetch medical records for pet ${petId}:`, err);
+            return createMockResponse(null, false);
           });
           
           if (medicalResponse.ok) {
-            const medicalData = await medicalResponse.json();
-            let records = [];
-            
-            if (medicalData.medical_records && Array.isArray(medicalData.medical_records)) {
-              records = medicalData.medical_records;
-            } else if (medicalData.data && Array.isArray(medicalData.data)) {
-              records = medicalData.data;
-            } else if (Array.isArray(medicalData)) {
-              records = medicalData;
-            }
-            
-            records.forEach((record: any) => {
-              if (record.transaction_id) {
-                medicalTransactionIds.add(record.transaction_id);
-              }
+            const medicalData = await medicalResponse.json().catch(err => {
+              console.warn(`⚠️ Error parsing medical data for pet ${petId}:`, err);
+              return null;
             });
+            
+            if (medicalData) {
+              const records = safeArrayAccess(medicalData);
+              records.forEach((record: any) => {
+                if (record && record.transaction_id) {
+                  medicalTransactionIds.add(record.transaction_id);
+                }
+              });
+            }
           }
         } catch (error) {
           console.warn(`⚠️ Could not fetch medical records for pet:`, error);
@@ -337,40 +411,71 @@ const TransactionScreen = () => {
     }
   };
 
-  // OPTIMIZED: Petshop transactions
+  // OPTIMIZED: Petshop transactions with better error handling
   const processPetshopTransactions = async (data: any): Promise<TransactionItem[]> => {
     try {
       console.log('🛒 Processing petshop transactions...');
+      
+      if (!data || !data.transactionData) {
+        console.warn('⚠️ No transaction data available for petshop');
+        return [];
+      }
+
       const { transactionData, productCategoryMap, medicalTransactionIds, API_ENDPOINTS } = data;
       
       const result: TransactionItem[] = [];
       const token = await getAuthToken();
       
-      for (const tx of transactionData.transactions) {
+      if (!token) {
+        console.warn('⚠️ No token available for fetching transaction details');
+        return [];
+      }
+
+      const transactions = safeArrayAccess(transactionData);
+      
+      for (const tx of transactions) {
         try {
+          if (!tx || typeof tx !== 'object' || !tx.id) continue;
+
           // Skip if transaction is medical
           if (medicalTransactionIds.has(tx.id)) {
             console.log(`🏥 Transaction ${tx.id} is medical - skipping from petshop`);
             continue;
           }
           
+          if (!API_ENDPOINTS.transactionDetails) continue;
+
           const detailResponse = await fetch(API_ENDPOINTS.transactionDetails(tx.id), {
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+          }).catch(err => {
+            console.warn(`⚠️ Failed to fetch details for transaction ${tx.id}:`, err);
+            return createMockResponse(null, false);
           });
           
           if (!detailResponse.ok) continue;
           
-          const detail: APITransactionDetail = await detailResponse.json();
+          const detail: APITransactionDetail = await detailResponse.json().catch(err => {
+            console.warn(`⚠️ Error parsing transaction detail ${tx.id}:`, err);
+            return null;
+          });
           
-          if (detail.products && detail.products.length > 0) {
+          if (!detail || !detail.products) continue;
+
+          const products = safeArrayAccess(detail.products);
+          
+          if (products.length > 0) {
             // Check if has clinic products
-            const hasClinicProducts = detail.products.some(product => {
+            const hasClinicProducts = products.some(product => {
+              if (!product || !product.product_id) return false;
               const category = productCategoryMap.get(product.product_id);
               return category && ['Medical Service', 'Consultation', 'Treatment', 'Surgery'].includes(category);
             });
             
             if (!hasClinicProducts) {
-              const itemCount = detail.products.reduce((total, product) => total + product.product_count, 0);
+              const itemCount = products.reduce((total, product) => {
+                if (!product || typeof product.product_count !== 'number') return total;
+                return total + product.product_count;
+              }, 0);
               
               result.push({
                 id: tx.id.toString(),
@@ -390,64 +495,91 @@ const TransactionScreen = () => {
       return result;
     } catch (error) {
       console.error('❌ Error processing petshop transactions:', error);
-      throw error;
+      return [];
     }
   };
 
-  // OPTIMIZED: Petclinic transactions
+  // OPTIMIZED: Petclinic transactions with better error handling
   const processPetclinicTransactions = async (data: any): Promise<TransactionItem[]> => {
     try {
       console.log('🏥 Processing petclinic transactions...');
+      
+      if (!data || !data.appointmentData) {
+        console.warn('⚠️ No appointment data available for petclinic');
+        return [];
+      }
+
       const { appointmentData, transactionData } = data;
       const result: TransactionItem[] = [];
       
+      const appointments = safeArrayAccess(appointmentData);
+      const transactions = safeArrayAccess(transactionData);
+      
       // Process appointments
-      for (const appointment of appointmentData.appointments) {
-        let appointmentPrice = formatCurrency(75000); // Default consultation price
-        
-        // Try to get price from related transaction
-        const relatedTx = transactionData.transactions.find((tx: any) => tx.id === appointment.appointment_id);
-        if (relatedTx) {
-          appointmentPrice = formatCurrency(relatedTx.price);
-        } else if (appointmentData.price) {
-          appointmentPrice = formatCurrency(appointmentData.price);
+      for (const appointment of appointments) {
+        try {
+          if (!appointment || typeof appointment !== 'object' || !appointment.appointment_id) continue;
+
+          let appointmentPrice = formatCurrency(75000); // Default consultation price
+          
+          // Try to get price from related transaction
+          const relatedTx = transactions.find((tx: any) => 
+            tx && tx.id === appointment.appointment_id
+          );
+          
+          if (relatedTx && typeof relatedTx.price === 'number') {
+            appointmentPrice = formatCurrency(relatedTx.price);
+          } else if (appointmentData.price && typeof appointmentData.price === 'number') {
+            appointmentPrice = formatCurrency(appointmentData.price);
+          }
+          
+          result.push({
+            id: `apt-${appointment.appointment_id}`,
+            transactionNumber: `#APT-${appointment.appointment_id.toString().padStart(3, '0')}`,
+            date: formatDate(appointment.date),
+            itemCount: 1,
+            totalAmount: appointmentPrice
+          });
+        } catch (error) {
+          console.error(`❌ Error processing appointment ${appointment?.appointment_id}:`, error);
         }
-        
-        result.push({
-          id: `apt-${appointment.appointment_id}`,
-          transactionNumber: `#APT-${appointment.appointment_id.toString().padStart(3, '0')}`,
-          date: formatDate(appointment.date),
-          itemCount: 1,
-          totalAmount: appointmentPrice
-        });
       }
       
       console.log('🏥 Final petclinic transactions:', result.length);
       return result;
     } catch (error) {
       console.error('❌ Error processing petclinic transactions:', error);
-      throw error;
+      return [];
     }
   };
 
-  // Main effect to load transactions
+  // Main effect to load transactions with better error handling
   useEffect(() => {
     const loadTransactions = async () => {
       console.log('🚀 Starting OPTIMIZED transaction loading...');
       setLoading(true);
-      setError(null);
-      
+       
       try {
         const userData = await getCurrentUser();
         if (!userData) {
-          throw new Error('Failed to get user information');
+          console.warn('⚠️ No user data available - showing empty state');
+          setTransactions({
+            petshop: [],
+            petclinic: []
+          });
+          return;
         }
         
         setCurrentUser(userData);
         
         const token = await getAuthToken();
         if (!token) {
-          throw new Error('Authentication required');
+          console.warn('⚠️ No authentication token - showing empty state');
+          setTransactions({
+            petshop: [],
+            petclinic: []
+          });
+          return;
         }
         
         // Fetch all data in optimized way
@@ -470,9 +602,12 @@ const TransactionScreen = () => {
         
         console.log('✅ OPTIMIZED transaction loading completed!');
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-        console.error('❌ Error loading optimized transactions:', errorMessage);
-        setError(errorMessage);
+        console.error('❌ Error loading optimized transactions:', err);
+        // Set empty data instead of showing error
+        setTransactions({
+          petshop: [],
+          petclinic: []
+        });
       } finally {
         setLoading(false);
       }
@@ -481,17 +616,21 @@ const TransactionScreen = () => {
     loadTransactions();
   }, []);
 
-  // Refresh data
+  // Refresh data with better error handling
   const handleRefresh = async () => {
     console.log('🔄 Refreshing transactions...');
-    setLoading(true);
-    setError(null);
+    setLoading(true); 
     
     try {
       console.log('👤 Refresh Step 1: Getting current user details...');
       const userData = await getCurrentUser();
       if (!userData) {
-        throw new Error('Failed to get user information');
+        console.warn('⚠️ No user data available during refresh');
+        setTransactions({
+          petshop: [],
+          petclinic: []
+        });
+        return;
       }
       
       setCurrentUser(userData);
@@ -499,7 +638,12 @@ const TransactionScreen = () => {
       console.log('🔑 Refresh Step 2: Getting auth token...');
       const token = await getAuthToken();
       if (!token) {
-        throw new Error('Authentication required');
+        console.warn('⚠️ No authentication token during refresh');
+        setTransactions({
+          petshop: [],
+          petclinic: []
+        });
+        return;
       }
       
       console.log('📊 Refresh Step 3: Fetching transactions and appointments...');
@@ -517,24 +661,12 @@ const TransactionScreen = () => {
       
       console.log('✅ Refresh completed successfully!');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      console.error('❌ Error refreshing transactions:', errorMessage);
-      setError(errorMessage);
-      
-      if (errorMessage.includes('Authentication') || errorMessage.includes('token') || errorMessage.includes('login')) {
-        Alert.alert(
-          'Authentication Required', 
-          'Please login to refresh your transactions.',
-          [
-            { text: 'OK', onPress: () => {
-              // Navigate to login screen
-              // navigation.navigate('Login');
-            }}
-          ]
-        );
-      } else {
-        Alert.alert('Error', `Failed to refresh transactions: ${errorMessage}`);
-      }
+      console.error('❌ Error refreshing transactions:', err);
+      // Just set empty data, don't show error dialog
+      setTransactions({
+        petshop: [],
+        petclinic: []
+      });
     } finally {
       setLoading(false);
       console.log('🏁 Refresh completed');
@@ -576,26 +708,26 @@ const TransactionScreen = () => {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#2196F3" />
             <Text style={styles.loadingText}>Memuat riwayat transaksi...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <MaterialIcons name="error-outline" size={48} color="#F44336" />
-            <Text style={styles.errorText}>Gagal memuat riwayat transaksi</Text>
-            <Text style={styles.errorDetail}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-              <Text style={styles.retryButtonText}>Coba Lagi</Text>
-            </TouchableOpacity>
-          </View>
+          </View> 
         ) : (
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             {transactions[activeTab].length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <MaterialIcons name="receipt-long" size={48} color="#BDBDBD" />
-                <Text style={styles.emptyText}>Belum ada riwayat transaksi</Text>
-                <Text style={styles.emptySubText}>
+              <View style={styles.emptyState}>
+                <MaterialIcons 
+                  name="receipt-long" 
+                  size={64} 
+                  color="#E0E0E0" 
+                  style={styles.emptyIcon}
+                />
+                <Text style={styles.emptyStateText}>
                   {activeTab === 'petshop' 
-                    ? 'Belum ada pembelian di petshop' 
-                    : 'Belum ada kunjungan ke klinik'}
+                    ? 'Belum ada transaksi petshop' 
+                    : 'Belum ada transaksi petclinic'}
+                </Text>
+                <Text style={styles.emptyStateSubtext}>
+                  {activeTab === 'petshop' 
+                    ? 'Transaksi pembelian akan muncul di sini' 
+                    : 'Transaksi klinik akan muncul di sini'}
                 </Text>
               </View>
             ) : (
@@ -619,7 +751,7 @@ const TransactionScreen = () => {
       </View>
     </SafeAreaView>
   );
-};
+}; 
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -714,23 +846,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  // Updated empty state styles to match ReservationListScreen
+  emptyState: {
     alignItems: 'center',
-    padding: 40,
-    minHeight: 300,
+    justifyContent: 'center',
+    paddingVertical: 40,
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#666',
-    marginTop: 16,
+  emptyIcon: {
+    marginBottom: 16,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#9E9E9E',
+    fontWeight: '600',
     marginBottom: 8,
   },
-  emptySubText: {
+  emptyStateSubtext: {
     fontSize: 14,
-    color: '#999',
+    color: '#BDBDBD',
     textAlign: 'center',
   },
   scrollContainer: {
