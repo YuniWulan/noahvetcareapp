@@ -48,7 +48,26 @@ export const ResetPasswordScreen = ({ navigation }: Props) => {
       return;
     }
 
-    setModalVisible(true);
+    // Show modal with slight delay to ensure state is properly set
+    setTimeout(() => {
+      setModalVisible(true);
+    }, 100);
+  };
+
+  const handleTogglePasswordVisibility = () => {
+    setShowPassword(prev => !prev);
+  };
+
+  const handleToggleConfirmVisibility = () => {
+    setShowConfirm(prev => !prev);
+  };
+
+  const handleModalClose = () => {
+    setModalVisible(false);
+    // Add delay before navigation to ensure modal closes properly
+    setTimeout(() => {
+      navigation.navigate("Login");
+    }, 200);
   };
 
   return (
@@ -86,12 +105,13 @@ export const ResetPasswordScreen = ({ navigation }: Props) => {
                     autoCorrect={false}
                   />
                   <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
+                    onPress={handleTogglePasswordVisibility}
                     style={styles.icon}
+                    activeOpacity={0.7}
                   >
                     <Ionicons
                       name={showPassword ? "eye" : "eye-off"}
-                      size={20}
+                      size={24}
                       color="#888"
                     />
                   </TouchableOpacity>
@@ -105,7 +125,7 @@ export const ResetPasswordScreen = ({ navigation }: Props) => {
                 </Text>
                 <View style={styles.passwordWrapper}>
                   <TextInput
-                      style={styles.passwordInputFull}
+                    style={styles.passwordInputFull}
                     placeholder="Konfirmasi Kata Sandi Baru"
                     placeholderTextColor="#A0A0A0"
                     secureTextEntry={!showConfirm}
@@ -115,12 +135,13 @@ export const ResetPasswordScreen = ({ navigation }: Props) => {
                     autoCorrect={false}
                   />
                   <TouchableOpacity
-                    onPress={() => setShowConfirm(!showConfirm)}
+                    onPress={handleToggleConfirmVisibility}
                     style={styles.icon}
+                    activeOpacity={0.7}
                   >
                     <Ionicons
                       name={showConfirm ? "eye" : "eye-off"}
-                      size={20}
+                      size={24}
                       color="#888"
                     />
                   </TouchableOpacity>
@@ -130,7 +151,11 @@ export const ResetPasswordScreen = ({ navigation }: Props) => {
             </ScrollView>
 
             <View style={styles.footer}>
-              <TouchableOpacity style={styles.button} onPress={handleResetPassword}>
+              <TouchableOpacity 
+                style={styles.button} 
+                onPress={handleResetPassword}
+                activeOpacity={0.8}
+              >
                 <Text style={styles.buttonText}>Ubah Kata Sandi</Text>
               </TouchableOpacity>
             </View>
@@ -139,10 +164,7 @@ export const ResetPasswordScreen = ({ navigation }: Props) => {
 
         <PasswordUpdatedModal
           visible={modalVisible}
-          onClose={() => {
-            setModalVisible(false);
-            navigation.navigate("Login");
-          }}
+          onClose={handleModalClose}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -181,7 +203,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     fontFamily: "Lexend-Regular",
   },
-    formGroup: {
+  formGroup: {
     width: "100%",
     marginBottom: 15,
   },
@@ -250,4 +272,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Lexend-Regular",
   },
-});
+}); 

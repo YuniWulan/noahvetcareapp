@@ -2,15 +2,13 @@ import React, { useRef, useState } from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Keyboard } from "react-native";
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';  
-
-console.log(require('react-native').TouchableOpacity);
-
+ 
 type Props = NativeStackScreenProps<RootStackParamList, 'OtpVerification'>;
 
 export const OtpVerificationScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { email } = route.params;
-
   
+  const { email } = route.params;
+ 
   const [otp, setOtp] = useState(Array(6).fill("")); 
   const inputRefs = Array(6).fill(0).map(() => React.createRef<TextInput>());
 
@@ -39,14 +37,40 @@ export const OtpVerificationScreen: React.FC<Props> = ({ navigation, route }) =>
       return;
     }
 
-    Alert.alert("Sukses", "Kode OTP benar. Silakan atur ulang kata sandi Anda.");
-    navigation.navigate("ResetPassword");
+    // Gunakan setTimeout untuk memastikan Alert tertutup sebelum navigasi
+    Alert.alert(
+      "Sukses", 
+      "Kode OTP benar. Silakan atur ulang kata sandi Anda.",
+      [
+        {
+          text: "OK",
+          onPress: () => {
+            // Navigasi setelah user menekan OK
+            setTimeout(() => {
+              navigation.navigate("ResetPassword");
+            }, 100);
+          }
+        }
+      ]
+    );
   };
 
   const handleResendCode = () => {
-    Alert.alert("Kode OTP baru telah dikirim ke email Anda.");
-    setOtp(Array(6).fill(""));
-    inputRefs[0].current?.focus();
+    Alert.alert(
+      "Info",
+      "Kode OTP baru telah dikirim ke email Anda.",
+      [
+        {
+          text: "OK",
+          onPress: () => {
+            setOtp(Array(6).fill(""));
+            setTimeout(() => {
+              inputRefs[0].current?.focus();
+            }, 100);
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -163,4 +187,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontFamily: "Lexend-Regular",
   },
-});
+}); 

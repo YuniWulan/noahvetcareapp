@@ -265,7 +265,7 @@ const ReservationDetail: React.FC<ReservationDetailProps> = ({ route, navigation
       };
 
       // Fetch doctor details if available
-      let doctorName = data.doctor_name || 'Dr. Tidak Diketahui';
+      let doctorName = data.doctor_name || 'Doctor shioriko';
       if (data.doctor_id && !data.doctor_name) {
         logDebug(`Fetching doctor name for doctor_id: ${data.doctor_id}`);
         try {
@@ -548,7 +548,7 @@ const ReservationDetail: React.FC<ReservationDetailProps> = ({ route, navigation
             >
               <Ionicons name="arrow-back" size={24} color="#000" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Reservasi Anda</Text>
+            <Text style={styles.headerTitle}>Reservasi Detail</Text>
             <View style={styles.placeholder} />
           </View>
 
@@ -664,7 +664,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#ffff',
   },
   petSection: {
     alignItems: 'center',
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   detailsContainer: {
-    backgroundColor: '#F9F9F9',
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 15,
   },
@@ -841,6 +841,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#000',
     lineHeight: 20,
+    textAlign: 'left'
   },
 });
 
