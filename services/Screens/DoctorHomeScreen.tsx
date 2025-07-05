@@ -406,7 +406,7 @@ const DoctorHomeScreen: React.FC = () => {
           const timeStr = fallbackDate.toLocaleTimeString('id-ID', {
             hour: '2-digit',
             minute: '2-digit',
-            hour12: true,
+            hour12: false,
             timeZone: 'Asia/Jakarta'
           });
 
@@ -435,9 +435,9 @@ const DoctorHomeScreen: React.FC = () => {
         const timeStr = appointmentDate.toLocaleTimeString('id-ID', {
           hour: '2-digit',
           minute: '2-digit',
-          hour12: true,
+          hour12: false,
           timeZone: 'Asia/Jakarta'
-        });
+        }).replace(':', '.');
 
         return {
           id: appointment.appointment_id?.toString() || `temp-${Date.now()}`,
@@ -555,29 +555,31 @@ const DoctorHomeScreen: React.FC = () => {
   };
 
   // Tambahkan juga fungsi helper yang lebih robust untuk parsing tanggal Indonesia
-  const parseIndonesianDateImproved = (dateStr: string, timeStr?: string): Date | null => {
-    try {
+  const parseIndonesianDateImproved = (dateStr: string, timeStr?: string) => {
+      // Map hari Indonesia ke Inggris
+      const dayMap: { [key: string]: string } = {
+        'Senin': 'Monday', 'Selasa': 'Tuesday', 'Rabu': 'Wednesday',
+        'Kamis': 'Thursday', 'Jumat': 'Friday', 'Sabtu': 'Saturday', 'Minggu': 'Sunday'
+      };
+      
       // Map bulan Indonesia ke angka
       const monthMap: { [key: string]: number } = {
         'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'Mei': 4, 'Jun': 5,
         'Jul': 6, 'Agu': 7, 'Sep': 8, 'Okt': 9, 'Nov': 10, 'Des': 11
       };
-
+      
       // Parse tanggal: "Senin, 30 Jun" -> 30 Jun 2025
       const dateMatch = dateStr.match(/\w+,\s*(\d+)\s*(\w+)/);
       if (!dateMatch) return null;
-
+      
       const day = parseInt(dateMatch[1]);
       const month = monthMap[dateMatch[2]];
-
-      // Gunakan tahun yang lebih dinamis
-      const currentYear = new Date().getFullYear();
-      const year = currentYear; // atau currentYear + 1 jika needed
-
+      const year = 2025; // Asumsikan tahun 2025
+      
       if (month === undefined) return null;
-
+      
       let date = new Date(year, month, day);
-
+      
       // Parse waktu jika ada: "04.00 PM" -> 16:00
       if (timeStr) {
         const timeMatch = timeStr.match(/(\d+)\.(\d+)\s*(AM|PM)/);
@@ -585,23 +587,16 @@ const DoctorHomeScreen: React.FC = () => {
           let hours = parseInt(timeMatch[1]);
           const minutes = parseInt(timeMatch[2]);
           const period = timeMatch[3];
-
+          
           if (period === 'PM' && hours !== 12) hours += 12;
           if (period === 'AM' && hours === 12) hours = 0;
-
+          
           date.setHours(hours, minutes, 0, 0);
         }
-      } else {
-        // Set default time ke 12:00 jika tidak ada waktu
-        date.setHours(12, 0, 0, 0);
       }
-
+      
       return date;
-    } catch (error) {
-      console.error('Error parsing Indonesian date:', error);
-      return null;
-    }
-  };
+    };
 
   // Update fungsi getTimeLabel untuk lebih akurat
   const getTimeLabelImproved = (reservation: Reservation): string => {
@@ -789,7 +784,6 @@ const DoctorHomeScreen: React.FC = () => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Jadwal Mendatang</Text>
             <TouchableOpacity
-              style={styles.viewAllButton}
               onPress={handleViewAllReservations}
               activeOpacity={0.8}
             >
@@ -963,12 +957,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
-  },
-  viewAllButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: '#f0f8ff',
   },
   viewAllButtonText: {
     color: '#2196F3',

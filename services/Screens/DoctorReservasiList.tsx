@@ -249,23 +249,21 @@ const formatDate = (dateString: string): string => {
 };
 
 const formatTime = (dateString: string): string => {
-  if (!dateString) return 'Time not set';
-  
+  if (!dateString) return 'Waktu tidak ditentukan';
+
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
-      return 'Invalid time';
+      return 'Waktu tidak valid';
     }
-    
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-    
-    return `${displayHour.toString().padStart(2, '0')}.${minutes.toString().padStart(2, '0')} ${ampm}`;
+
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+
+    return `${hours}.${minutes}`; // Example: 14.30
   } catch (error) {
     console.error('Error formatting time:', error);
-    return 'Invalid time';
+    return 'Waktu tidak valid';
   }
 };
 
@@ -338,7 +336,7 @@ const DoctorReservations = () => {
   // Status options
   const statusOptions: { label: string; value: string; color: string }[] = [
     { label: 'Menunggu', value: 'Pending', color: '#FFC107' },
-    { label: 'Terjadwal', value: 'Confirmed', color: '#009C41' },
+    { label: 'Terjadwal', value: 'Confirmed', color: '#2196F3' },
     { label: 'Ditolak', value: 'Rejected', color: '#F44336' },
     { label: 'Selesai', value: 'Completed', color: '#4CAF50' },
   ];
@@ -557,11 +555,22 @@ const DoctorReservations = () => {
   const getStatusColor = (status: ReservationStatus): string => {
     switch (status) {
       case 'Selesai': return '#4CAF50';
-      case 'Terjadwal': return '#009C41';
+      case 'Terjadwal': return '#2196F3';
       case 'Menunggu': return '#FFC107';
       case 'Ditolak': return '#F44336';
       default: return '#9E9E9E';
     }
+  };
+
+  const getStatusBackgroundColor = (status: string): string => {
+    const colorMap: Record<string, string> = {
+      'Selesai': '#E8F5E8',
+      'Terjadwal': '#E3F2FD',
+      'Menunggu': '#FFF3CD',
+      'Ditolak': '#FFEBEE',
+      'Dibatalkan': '#FFEBEE',
+    };
+    return colorMap[status] || '#f5f5f5';
   };
 
   const handleReservationPress = (reservation: ReservationItem) => {
@@ -603,22 +612,6 @@ const DoctorReservations = () => {
     }
   };
 
-//   // Show error state
-//   if (error && !doctorId) {
-//     return (
-//       <SafeAreaView style={styles.safeArea}>
-//         <View style={[styles.container, styles.centerContent]}>
-//           <MaterialIcons name="error-outline" size={48} color="#F44336" />
-//           <Text style={styles.errorText}>{error}</Text>
-//           <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-//             <Text style={styles.retryButtonText}>Retry</Text>
-//           </TouchableOpacity>
-//         </View>
-//       </SafeAreaView>
-//     );
-//   }
-
-  // Show loading for initial load
   if (!doctorId && !error) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -655,7 +648,7 @@ const DoctorReservations = () => {
             onPress={() => setActiveTab('Reservasi')}
           >
             <Text style={[styles.tabText, activeTab === 'Reservasi' && styles.activeTabText]}>
-              Reservasi ({filteredReservations.filter(r => r.status !== 'Selesai').length})
+              Reservasi
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -663,7 +656,7 @@ const DoctorReservations = () => {
             onPress={() => setActiveTab('Selesai')}
           >
             <Text style={[styles.tabText, activeTab === 'Selesai' && styles.activeTabText]}>
-              Selesai ({filteredReservations.filter(r => r.status === 'Selesai').length})
+              Selesai
             </Text>
           </TouchableOpacity>
         </View>
@@ -699,15 +692,23 @@ const DoctorReservations = () => {
                   onLongPress={() => handleReservationPress(reservation)}
                 >
                   <View style={styles.cardHeader}>
+                    <View style={styles.petIconContainer}>
+                      <MaterialIcons name="pets" size={28} color="#2196F3" />
+                    </View>
                     <View style={styles.cardHeaderLeft}>
                       <Text style={styles.petName}>{reservation.petName}</Text>
                       <Text style={styles.ownerName}>{reservation.ownerName}</Text>
                     </View>
                     <View style={[
                       styles.statusBadge, 
-                      { backgroundColor: getStatusColor(reservation.status) }
+                      { backgroundColor: getStatusBackgroundColor(reservation.status) }
                     ]}>
-                      <Text style={styles.statusText}>{reservation.status}</Text>
+                      <Text style={[
+                        styles.statusText,
+                        { color: getStatusColor(reservation.status) }
+                      ]}>
+                        {reservation.status}
+                      </Text>
                     </View>
                   </View>
                   
@@ -722,10 +723,6 @@ const DoctorReservations = () => {
                         <Text style={styles.dateTimeText}>{reservation.time}</Text>
                       </View>
                     </View>
-                    
-                    {reservation.notes && (
-                      <Text style={styles.notesText}>{reservation.notes}</Text>
-                    )}
                   </View>
                   
                   <View style={styles.cardFooter}>
@@ -934,6 +931,15 @@ const styles = StyleSheet.create({
   },
   cardHeaderLeft: {
     flex: 1,
+    marginRight: 12,
+  },
+  petIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   petName: {
