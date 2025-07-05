@@ -31,7 +31,7 @@ interface ReservationData {
   id: string;
   petName: string;
   petId?: string;
-  status: 'Scheduled' | 'Completed' | 'Cancelled';
+  status: 'Scheduled' | 'Completed' | 'Cancelled' | 'Waiting';
   doctorName: string;
   date: string;
   time: string;
@@ -51,7 +51,7 @@ interface ApiResponse {
   pet_id: string;
   doctor_id: string;
   date: string;
-  status?: 'scheduled' | 'completed' | 'canceled' | 'Scheduled' | 'Completed' | 'Cancelled';
+  status?: 'scheduled' | 'completed' | 'canceled' | 'Waiting' | 'Scheduled' | 'Completed' | 'Cancelled' | 'Waiting';
   notes: string;
   pet_name?: string;
   doctor_name?: string;
@@ -102,7 +102,8 @@ const getSpeciesIcon = (species: string) => {
 
 const getStatusInfo = (status?: string) => {
   switch (status) {
-    case 'Scheduled': return { color: '#27AE60', text: 'Terjadwal', bgColor: '#E8F5E8' };
+    case 'Scheduled': return { color: '#2196F3', text: 'Terjadwal', bgColor: '#E3F2FD' };
+    case 'Waiting' : return { color: '#FFC107', text: 'Menunggu', bgColor: '#FFF3CD'};
     case 'Completed': return { color: '#F39C12', text: 'Selesai', bgColor: '#FDF2E5' };
     case 'Cancelled': return { color: '#E74C3C', text: 'Dibatalkan', bgColor: '#FDEDEC' };
     default: return { color: '#7F8C8D', text: 'Tidak Diketahui', bgColor: '#F8F9FA' };
@@ -130,21 +131,21 @@ const formatDate = (dateString?: string): string => {
 };
 
 const formatTime = (dateString?: string): string => {
-  if (!dateString) return 'Tidak tersedia';
+  if (!dateString) return 'Waktu tidak ditentukan';
+
   try {
-    // Handle both ISO string and already formatted times
-    if (dateString.includes('T') || dateString.match(/^\d{4}-\d{2}-\d{2}/)) {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return dateString;
-      return date.toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Waktu tidak valid';
     }
-    return dateString; // Return as-is if already formatted (like "01.00 PM")
-  } catch {
-    return dateString;
+
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+
+    return `${hours}.${minutes}`; // Example: 14.30
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return 'Waktu tidak valid';
   }
 };
 
@@ -253,11 +254,12 @@ const ReservationDetail: React.FC<ReservationDetailProps> = ({ route, navigation
         'Appointment detail fetch'
       );
 
-      const mapApiStatusToDisplayStatus = (apiStatus: string): 'Scheduled' | 'Completed' | 'Cancelled' => {
+      const mapApiStatusToDisplayStatus = (apiStatus: string): 'Scheduled' | 'Completed' | 'Cancelled' | 'Waiting'=> {
         const status = apiStatus.toLowerCase();
         switch (status) {
           case 'scheduled': return 'Scheduled';
           case 'completed': return 'Completed';
+          case 'Waiting': return 'Waiting';
           case 'canceled': 
           case 'cancelled': return 'Cancelled';
           default: return 'Scheduled';
@@ -380,9 +382,11 @@ const ReservationDetail: React.FC<ReservationDetailProps> = ({ route, navigation
       status: data.status === 'Terjadwal' ? 'Scheduled' : 
               data.status === 'Selesai' ? 'Completed' : 
               data.status === 'Dibatalkan' ? 'Cancelled' : 
+              data.status === 'Menunggu' ? 'Waiting' :
               sourceData.status === 'scheduled' ? 'Scheduled' :
               sourceData.status === 'completed' ? 'Completed' :
               sourceData.status === 'canceled' ? 'Cancelled' :
+              sourceData.status === 'waiting' ? 'Waiting' :
               sourceData.status === 'Scheduled' ? 'Scheduled' :
               sourceData.status === 'Completed' ? 'Completed' :
               sourceData.status === 'Cancelled' ? 'Cancelled' : 'Scheduled',

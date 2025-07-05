@@ -1,23 +1,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Image, 
-  ImageBackground, 
-  Alert,
-  RefreshControl,
-  ActivityIndicator 
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ImageBackground, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { NavigationProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList, DoctorData } from '../../App';
+import * as Localization from 'expo-localization';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
  
@@ -485,24 +475,26 @@ const HomeScreen: React.FC = () => {
   };
 
   const formatTime = (dateString: string): string => {
-    if (!dateString) return 'Time not set';
-    
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Invalid time';
-      }
-      
-      const hours = date.getHours();
-      const minutes = date.getMinutes();
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-      
-      return `${displayHour.toString().padStart(2, '0')}.${minutes.toString().padStart(2, '0')} ${ampm}`;
-    } catch (error) {
-      console.error('Error formatting time:', error);
-      return 'Invalid time';
+    if (!dateString) return 'Waktu tidak ditentukan';
+
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Waktu tidak valid';
     }
+
+    const locale = Localization.locale || 'id-ID';
+
+    return new Intl.DateTimeFormat(locale, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Jakarta',
+    }).format(date);
+  } catch (error) {
+    console.error('Error formatting localized time:', error);
+    return 'Waktu tidak valid';
+  }
   };
 
   const mapStatus = (status: string): string => {
@@ -530,6 +522,17 @@ const HomeScreen: React.FC = () => {
     };
     
     return colorMap[status] || '#9E9E9E';
+  };
+
+  const getStatusBackgroundColor = (status: string): string => {
+    const colorMap: Record<string, string> = {
+      'Selesai': '#E8F5E8',
+      'Terjadwal': '#E3F2FD',
+      'Menunggu': '#FFF3CD',
+      'Ditolak': '#FFEBEE',
+      'Dibatalkan': '#FFEBEE',
+    };
+    return colorMap[status] || '#f5f5f5';
   };
 
   // Mock data for fallback (reduced for testing)
@@ -708,10 +711,13 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('DetailPetScreen', { petId: pet.id });
   }, [navigation]);
 
-  const handleReservationPress = useCallback((reservation: Reservation) => {
-    console.log('Reservation selected:', reservation);
-    //navigation.navigate('DetailReservation', { reservationId: reservation.id });
-  }, [navigation]);
+  const handleReservationPress = (reservation: Reservation) => {
+    console.log('Navigasi ke DetailReservation dengan reservationId:', reservation.id);
+    navigation.navigate('DetailReservation', { 
+      reservationId: reservation.id,
+      reservationData: reservation
+    });
+  };
 
   const handleReservationButton = useCallback(() => {
     navigation.navigate('Reservasi');
@@ -996,69 +1002,30 @@ const HomeScreen: React.FC = () => {
                 <Text style={styles.reservationDoctorName}>
                   Dr. {reservation?.doctorName || reservation?.doctor_name || 'Unknown'}
                 </Text>
-                <View style={styles.reservationTimeContainer}>
-                  <Text style={styles.reservationTimeLabel}>
-                    {(() => {
-                      try {
-                        // Function helper untuk parse tanggal Indonesia
-                        const parseIndonesianDate = (dateStr: string, timeStr?: string) => {
-                          const monthMap: { [key: string]: number } = {
-                            'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'Mei': 4, 'Jun': 5,
-                            'Jul': 6, 'Agu': 7, 'Sep': 8, 'Okt': 9, 'Nov': 10, 'Des': 11
-                          };
-              
-                          const dateMatch = dateStr.match(/\w+,\s*(\d+)\s*(\w+)/);
-                          if (!dateMatch) return null;
-              
-                          const day = parseInt(dateMatch[1]);
-                          const month = monthMap[dateMatch[2]];
-                          const year = 2025;
-              
-                          if (month === undefined) return null;
-              
-                          let date = new Date(year, month, day);
-              
-                          if (timeStr) {
-                            const timeMatch = timeStr.match(/(\d+)\.(\d+)\s*(AM|PM)/);
-                            if (timeMatch) {
-                              let hours = parseInt(timeMatch[1]);
-                              const minutes = parseInt(timeMatch[2]);
-                              const period = timeMatch[3];
-                          
-                              if (period === 'PM' && hours !== 12) hours += 12;
-                              if (period === 'AM' && hours === 12) hours = 0;
-                          
-                              date.setHours(hours, minutes, 0, 0);
-                            }
-                          }
-                          return date;
-                        };
-                    
-                        const reservationDate = reservation.originalDate || reservation.date;
-                        const reservationTime = reservation.time;
-                        const parsedDate = parseIndonesianDate(reservationDate, reservationTime);
-                    
-                        if (!parsedDate) return '';
-                    
-                        const now = new Date();
-                        const timeDiff = parsedDate.getTime() - now.getTime();
-                        const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-                    
-                        if (daysDiff === 0) return 'Hari ini';
-                        if (daysDiff === 1) return 'Besok';
-                        if (daysDiff > 1) return `${daysDiff} hari lagi`;
-                        return `${Math.abs(daysDiff)} hari yang lalu`;
-                      } catch (error) {
-                        return '';
-                      }
-                    })()}
-                  </Text>
-                  <Text style={styles.reservationDateTime}>
-                    {reservation.date} • {reservation.time}
+              </View>
+              <View style={styles.statusContainer}>
+                <View style={[
+                  styles.statusBadge, 
+                  { backgroundColor: getStatusBackgroundColor(reservation.status) }
+                ]}>
+                  <Text style={[
+                    styles.statusText,
+                    { color: getStatusColor(reservation.status) }
+                  ]}>
+                    {reservation.status}
                   </Text>
                 </View>
               </View>
-              <MaterialIcons name="chevron-right" size={24} color="#BDBDBD" />
+            </View>
+            <View style={styles.appointmentDetails}>
+              <View style={styles.detailItem}>
+                <MaterialIcons name="calendar-today" size={16} color="#666" />
+                <Text style={styles.detailText}>{reservation.date}</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <MaterialIcons name="access-time" size={16} color="#666" />
+                <Text style={styles.detailText}>{reservation.time}</Text>
+              </View>
             </View>
           </TouchableOpacity>
         ))}
@@ -1300,19 +1267,20 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   reservationCard: {
-    width: 280,
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,  
-    elevation: 3,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   reservationTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   reservationIconContainer: {
@@ -1359,41 +1327,39 @@ const styles = StyleSheet.create({
   reservationTimeContainer: {
     alignItems: 'flex-start',
   },
-  
-  reservationTimeLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 2,
+  appointmentDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
   },
-  
-  reservationDateTime: {
-    fontSize: 11,
-    color: '#757575',
-    fontWeight: '400',
-  },
-
-  datetimeContainer: {
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  reservationDate: {
-    fontSize: 14,
-    color: '#333',
-  },
-  reservationTime: {
+  detailText: {
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
+    paddingLeft: 6,
   },
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 12,
   },
   // Added: Status badge style (same as reservation list)
   statusBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
   },
   statusValue: {
     fontSize: 12,

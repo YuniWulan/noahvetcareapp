@@ -5,6 +5,8 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'; 
 import { RouteProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Localization from 'expo-localization';
+
 
 // Type definitions
 type ReservationStatus = 'Terjadwal' | 'Menunggu' | 'Ditolak' | 'Selesai';
@@ -176,24 +178,41 @@ const formatDate = (dateString: string): string => {
 };
 
 const formatTime = (dateString: string): string => {
-  if (!dateString) return 'Time not set';
-  
+  if (!dateString) return 'Waktu tidak ditentukan';
+
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
-      return 'Invalid time';
+      return 'Waktu tidak valid';
     }
-    
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-    
-    return `${displayHour.toString().padStart(2, '0')}.${minutes.toString().padStart(2, '0')} ${ampm}`;
+
+    const locale = Localization.locale || 'id-ID';
+
+    return new Intl.DateTimeFormat(locale, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Jakarta',
+    }).format(date);
   } catch (error) {
-    console.error('Error formatting time:', error);
-    return 'Invalid time';
+    console.error('Error formatting localized time:', error);
+    return 'Waktu tidak valid';
   }
+};
+
+const convertToIndonesianTime = (timeString: string) => {
+  // Split the time string into components
+  const [time, period] = timeString.split(' ');
+  let [hours, minutes] = time.split(':');
+  
+  // Convert to 24-hour format
+  if (period === 'PM' && hours !== '12') {
+    hours = String(Number(hours) + 12);
+  } else if (period === 'AM' && hours === '12') {
+    hours = '00';
+  }
+  
+  return `${hours}:${minutes}`;
 };
 
 const mapStatus = (backendStatus: string): ReservationStatus => {
@@ -471,6 +490,7 @@ const ReservationListScreen = () => {
                   <View style={styles.reservationIconContainer}>
                     <MaterialIcons name="pets" size={36} color="#2196F3" />
                   </View>
+                  
                   <View style={styles.reservationTextContainer}>
                     <Text style={styles.reservationName}>{item.petName}</Text>
                     <Text style={styles.doctorName}>Dr. {item.doctorName}</Text>
@@ -482,18 +502,14 @@ const ReservationListScreen = () => {
                   </View>
                   <MaterialIcons name="chevron-right" size={24} color="#BDBDBD" />
                 </View>
-                
                 <View style={styles.reservationBottomRow}>
                   <View style={styles.datetimeContainer}>
+                    <MaterialIcons name="calendar-today" size={16} color="#666" />
                     <Text style={styles.reservationDate}>{item.date}</Text>
-                    <Text style={styles.reservationTime}>{item.time}</Text>
                   </View>
-                  <View style={styles.statusContainer}>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-                      <Text style={[styles.statusValue, { color: getStatusColor(item.status) }]}>
-                        {item.status}
-                      </Text>
-                    </View>
+                  <View style={styles.datetimeContainer}>
+                    <MaterialIcons name="access-time" size={16} color="#666" />
+                    <Text style={styles.reservationTime}>{item.time}</Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -653,16 +669,21 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   datetimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
   reservationDate: {
     fontSize: 14,
     color: '#333',
+    fontWeight: '500',
+    paddingLeft: 6,
   },
   reservationTime: {
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
+    paddingLeft: 6,
   },
   statusContainer: {
     flexDirection: 'row',
